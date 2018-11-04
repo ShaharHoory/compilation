@@ -77,10 +77,10 @@ let namedCharParser = PC.disj (PC.word_ci "newline") (PC.disj (PC.word_ci "nul")
 
 let hexCharParser = PC.caten (PC.char_ci 'x') (PC.plus hexDigitParser);;
 
-let char_parser =
+(*let char_parser =
   let parser = PC.caten char_prefix (PC.disj visibleSimpleCharParser (PC.disj namedCharParser hexCharParser)) in
       PC.pack parser (fun (pref, ch) -> Char(ch));;
-
+*)
 (*END char parsering*)
 
 let _natural_ = PC.plus _digit_;; 
@@ -126,14 +126,40 @@ let _hex_float =
 (*number works! *)
 let _number_ = PC.disj (PC.disj (PC.disj _hex_float _float_) _hex_integer) _integer_ ;;
 
+let _sexpr_ =  PC.disj _boolean_parser_ _number_;;
+
+(*quotes works! *)
+let _quoted_ = 
+let parser = PC.caten (PC.char '\'') _sexpr_ in
+PC.pack parser (fun (c,e)-> Pair(Symbol("quote"), Pair(e, Nil)));; 
+
+let _quasi_quoted_ = 
+let parser = PC.caten (PC.char '`') _sexpr_ in
+PC.pack parser (fun (c,e)-> Pair(Symbol("quasiquote"), Pair(e, Nil)));;                
+
+let _unquote_spliced_ = 
+let parser = PC.caten (PC.char ',') _sexpr_ in
+PC.pack parser (fun (c,e)-> Pair(Symbol("unquote-splicing"), Pair(e, Nil)));;                
+
+let _unquoted_ = 
+let parser = PC.caten (PC.word_ci ",@") _sexpr_ in
+PC.pack parser (fun (c,e)-> Pair(Symbol("unquote"), Pair(e, Nil)));;                
+
 
 (*tests*)
 
-let (e, s) = char_parser "#/a";;
+let (e, s) =  _unquoted_ (string_to_list ",@#tfx1.3ab #t #f hh\n");;
 
-print_string (e);;
+print_string (list_to_string s);;
+let b = Bool(true);;
+let x =  Pair(Symbol("unquote"), Pair(Bool(true), Nil));;
+print_string (string_of_bool (sexpr_eq x e));
+
+(*let f e = match e with
+|Number(Float(e_f)) -> print_float e_f
+| _ -> print_string "pr"
+
+f e;;*)
 (*let b = Bool(false);;
 let x = Number(Int(5));;
   print_string (string_of_bool (sexpr_eq b e));*)
-
-
