@@ -56,8 +56,8 @@ end;; (* struct Reader *)
 
 (*boolean works!*)
 let _boolean_parser_ =
-let parser =  PC.disj (PC.word_ci "#t") (PC.word_ci "#f") in 
-PC.pack parser (fun (b)->if (list_to_string b) = "#t" then Bool(true) else Bool(false));;
+  let parser =  PC.disj (PC.word_ci "#t") (PC.word_ci "#f") in 
+  PC.pack parser (fun (b)->if (list_to_string b) = "#t" then Bool(true) else Bool(false));;
 
 (*START char parsering*)
 let _digit_  = PC.range '0' '9';;
@@ -71,45 +71,36 @@ let char_prefix = PC.word "#/" ;; (* need to check this!!! problem with meta cha
 let hex_prefix = PC.word "#x";;
 let hex_natural = PC.plus hexDigitParser;;
 
-let nullChar =  string_to_list "nul";;
-let newlineChar = string_to_list "newline";;
-let returnChar = string_to_list "return";;
-let tabChar = string_to_list "tab";;
-let formfeedChar = string_to_list "page";;
-let spaceChar = string_to_list "space";;
-
 let visibleSimpleCharParser =
   let simpleParser = PC.const (fun ch -> ch > ' ') in
   PC.pack simpleParser (fun (ch) -> Char(ch));;
 
+(*problem with inputs like "TAB" fix this *)
 let namedCharParser =
-  let namesParser = 
-    PC.disj (PC.word_ci "newline")
-      (PC.disj (PC.word_ci "nul")
-	 (PC.disj (PC.word_ci "page")
-	    (PC.disj (PC.word_ci "page")
-	       (PC.disj (PC.word_ci "return")
-		  (PC.disj (PC.word_ci "space") (PC.word_ci "tab")))))) in
-  PC.pack namesParser (
-    fun (e) ->
-      match e with
-      | nullChar -> Char('\000')
-      | newlineChar -> Char('\012')    (*check why all of this cases are unused!!!!!!*)
-      | returnChar -> Char('\015')
-      | tabChar -> Char('\011')
-      | formfeedChar -> Char('\014')
-      | spaceChar -> Char('\040')
+  let wordsParsersList = List.map (fun str -> PC.word_ci str) ["newline"; "nul"; "page"; "return"; "tab"; "space"] in
+  let disjParser = PC.disj_list wordsParsersList in
+  PC.pack disjParser (fun (e) -> match e with
+  | ['n'; 'u'; 'l'] -> Char('\000')
+  | ['n'; 'e'; 'w'; 'l'; 'i'; 'n'; 'e'] -> Char('\012')
+  | ['p'; 'a'; 'g'; 'e'] -> Char('\014')
+  | ['r'; 'e'; 't'; 'u'; 'r'; 'n'] -> Char('\015')
+  | ['t'; 'a'; 'b'] -> Char('\011')
+  | ['s'; 'p'; 'a'; 'c'; 'e'] -> Char('\040')
+  | _ -> Char('\000') (* I wanted to throw an exception but it didn't let me; anyway this case never happens *)
   );;
-	  
-let hexCharParser = PC.caten (PC.char_ci 'x') (PC.plus hexDigitParser);; (*TODO: add pack which transform this to Char*)
+
+let hexCharParser =
+  let parser = PC.caten (PC.char_ci 'x') (PC.plus hexDigitParser) in
+  PC.pack parser (fun (x, ch) -> Char(Char.chr(int_of_string ("0x" ^ (list_to_string ch)))));;
+
+ (*TODO: add pack which transform this to Char*)
 
 (*let char_parser =
   let parser = PC.caten char_prefix (PC.disj visibleSimpleCharParser (PC.disj namedCharParser hexCharParser)) in
   PC.pack parser (fun (pref, ch) -> Char((first ch)));; *)
 
 let char_parser =
-  let parser = PC.caten char_prefix namedCharParser in   (*above is the real function, this is just for testing each one of
-                                                           the parsers seperatly*)
+  let parser = PC.caten char_prefix (PC.disj_list [hexCharParser; namedCharParser; visibleSimpleCharParser]) in   
   PC.pack parser (fun (pref, ch) -> ch);;   (*No need to use Char constructor because in all the sub-parsers
 					      we do this so ch is already Char*)
 
@@ -163,12 +154,13 @@ let _number_ = PC.disj (PC.disj (PC.disj _hex_float _float_) _hex_integer) _inte
 
 (*let (e, s) = (PC.char 'a') (string_to_list "ab");;*)
 
-let (e,s) = char_parser (string_to_list "#/nul");;
+let (e,s) = char_parser (string_to_list "#/TAB");;
 
-(*print_string (list_to_string e);;*)
+(**print_string (list_to_string e);;**)
 
-let x =  Char('\000');;
-  print_string (string_of_bool (sexpr_eq x e));;
+
+let x =  Char('\011');;
+   print_string (string_of_bool (sexpr_eq x e));;
 
 (*let x = namedCharParser "newline";;*)
 
@@ -176,5 +168,6 @@ let x =  Char('\000');;
 (*let b = Bool(false);;
 let x = Number(Int(5));;
   print_string (string_of_bool (sexpr_eq b e));*)
+
 
 
