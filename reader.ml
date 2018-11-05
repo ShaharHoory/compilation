@@ -7,6 +7,8 @@
 
 #use "pc.ml";;
 
+open PC
+
 exception X_not_yet_implemented;;
 exception X_this_should_not_happen;;
   
@@ -67,7 +69,7 @@ let a_to_F_ = PC.range 'A' 'F';;
 let hexDigitParser = PC.disj _digit_ (PC.disj a_to_f_ a_to_F_);; 
 
 
-let char_prefix = PC.word "#/" ;; (* need to check this!!! problem with meta char "/" !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! *)
+let char_prefix = PC.word "#\\" ;; (* need to check this!!! problem with meta char "/" !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! *)
 let hex_prefix = PC.word "#x";;
 let hex_natural = PC.plus hexDigitParser;;
 
@@ -77,7 +79,7 @@ let visibleSimpleCharParser =
 
 (*problem with inputs like "TAB" fix this *)
 let namedCharParser =
-  let wordsParsersList = List.map (fun str -> PC.word_ci str) ["newline"; "nul"; "page"; "return"; "tab"; "space"] in
+  let wordsParsersList = List.map (fun str -> word_ci str) ["newline"; "nul"; "page"; "return"; "tab"; "space"] in
   let disjParser = PC.disj_list wordsParsersList in
   PC.pack disjParser (fun (e) -> match e with
   | ['n'; 'u'; 'l'] -> Char('\000')
@@ -93,17 +95,10 @@ let hexCharParser =
   let parser = PC.caten (PC.char_ci 'x') (PC.plus hexDigitParser) in
   PC.pack parser (fun (x, ch) -> Char(Char.chr(int_of_string ("0x" ^ (list_to_string ch)))));;
 
- (*TODO: add pack which transform this to Char*)
-
-(*let char_parser =
-  let parser = PC.caten char_prefix (PC.disj visibleSimpleCharParser (PC.disj namedCharParser hexCharParser)) in
-  PC.pack parser (fun (pref, ch) -> Char((first ch)));; *)
-
 let char_parser =
   let parser = PC.caten char_prefix (PC.disj_list [hexCharParser; namedCharParser; visibleSimpleCharParser]) in   
   PC.pack parser (fun (pref, ch) -> ch);;   (*No need to use Char constructor because in all the sub-parsers
 					      we do this so ch is already Char*)
-
 (*END char parsering*)
 
 let _natural_ = PC.plus _digit_;; 
@@ -149,18 +144,87 @@ let _hex_float =
 (*number works! *)
 let _number_ = PC.disj (PC.disj (PC.disj _hex_float _float_) _hex_integer) _integer_ ;;
 
+(*------Strings-------*)
 
-(*tests*)
+(*symbol parser START*)
+let _a_to_z = PC.range 'a' 'z';;
+let _A_to_Z = PC.range 'A' 'Z';;
+let symbolChar = PC.disj_list [_digit_; _a_to_z; _A_to_Z;
+			       char '!';
+			       char '$';
+			       char '^';
+			       char '*';
+			       char '-';
+			       char '_';
+			       char '=';
+			       char '+';
+			       char '<';
+			       char '>';
+			       char '?';
+			       char '/';
+			       char ':'
+			      ];;
+let symbol_parser =
+  let symbolCharsParser = PC.plus symbolChar in
+  PC.pack symbolCharsParser (fun s -> Symbol(String.lowercase (list_to_string s)));;
+(*symbol parser END*)
 
-(*let (e, s) = (PC.char 'a') (string_to_list "ab");;*)
+(*string parser START*)
+let stringLiteralChar =
+  let parser = const (fun c -> c <> '\\' && c <> '"') in (*Check the \\ !!!!!!!!!!!!!!!!!!!!!*)
+  pack parser (fun ch -> Char(ch));; 
 
-let (e,s) = char_parser (string_to_list "#/TAB");;
+let stringHexChar =
+  let backslashXParser = word_ci "\x" in (*TODO: check if word or word_ci*)
+  let semiColonParser = char ';' in
+  let parser = caten backslashXParser (caten (plus hexDigitParser) semiColonParser) in
+  pack parser (fun (bs_x, (hexdigits, semicolon)) -> Char(Char.chr(int_of_string ("0x" ^ (list_to_string hexdigits)))));; (*converting
+															  hexdigits to their
+															  real char value 
+															  (from ascii table)
+															*)
+    
+let stringMetaChar =
+  let parser = disj_list [word "\\"; (*CHEK ME*) (*TODO: in the table in the assignment they say that ther's also \nul ???? CHECK*)
+			  word "\""; (*CHEK ME TOO PAPA!!! :-( *)
+			  word "\t";
+			  word "\nul";
+			  word "\f";
+			  word "\n";
+			  word "\r"
+			 ] in
+			 pack parser (fun chlist -> match chlist with
+			 | ['\\'; '\\'] -> Char(Char.chr(92))
+			 | ['\\'; 't'] -> Char(Char.chr(9))
+			 | ['\\'; 'T']-> Char(Char.chr(9))
+			 | ['\\'; 'n'; 'u'; 'l'] ->  Char(Char.chr(0)) (*again the same prob. like in namedCharParser NUL/nUL etc. *)
+			 | ['\\'; '"'] ->  Char(Char.chr(34))
+			 | ['\\'; 'f'] ->  Char(Char.chr(12))
+			 | ['\\'; 'F'] ->  Char(Char.chr(12))
+			 | ['\\'; 'n'] ->  Char(Char.chr(10))
+			 | ['\\'; 'N'] ->  Char(Char.chr(10))
+			 | ['\\'; 'r'] ->  Char(Char.chr(13))
+			 | ['\\'; 'R'] ->  Char(Char.chr(13))
+			 | _ -> Char('\000') (* I wanted to throw an exception but it didn't let me; anyway this case never happens *)
+			 );;
+
+let stringCharParser = disj_list [stringLiteralChar; stringHexChar; stringMetaChar];; (*the result is already a Char
+											because we packed each sub-parser*)
+let string_parser =
+  let quote = char '"' in
+  let parser = caten quote (caten (star stringCharParser) quote) in
+  pack parser (fun (q1, (chars, q2)) -> String(list_to_string chars));;
+(*string paeser END*)
+
+(*--------tests--------*)
+
+
+(*---char tests---*)
+(*let (e,s) = char_parser (string_to_list "#\a");;
+  let x =  Char('a');;*)
+(***print_string (string_of_bool (sexpr_eq x e));; COMMENT OUT FOR TESTING *)
 
 (**print_string (list_to_string e);;**)
-
-
-let x =  Char('\011');;
-   print_string (string_of_bool (sexpr_eq x e));;
 
 (*let x = namedCharParser "newline";;*)
 
