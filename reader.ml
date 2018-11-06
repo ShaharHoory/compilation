@@ -170,54 +170,78 @@ let symbol_parser =
 (*symbol parser END*)
 
 (*string parser START*)
-let stringLiteralChar =
-  let parser = const (fun c -> c <> '\\' && c <> '"') in (*Check the \\ !!!!!!!!!!!!!!!!!!!!!*)
-  pack parser (fun ch -> Char(ch));; 
+let stringLiteralChar = const (fun c -> c <> '\\' && c <> '\"');; (*Check BOTH !!!!!!!!!!!!!!!!!!!!!*)
+ 
 
-let stringHexChar =
+(* we return chars(really chars) and not Char (sexp chars) so that we can cuild the whole string from whose chars *)
+let stringHexChar = 
   let backslashXParser = word_ci "\x" in (*TODO: check if word or word_ci*)
   let semiColonParser = char ';' in
   let parser = caten backslashXParser (caten (plus hexDigitParser) semiColonParser) in
-  pack parser (fun (bs_x, (hexdigits, semicolon)) -> Char(Char.chr(int_of_string ("0x" ^ (list_to_string hexdigits)))));; (*converting
+  pack parser (fun (bs_x, (hexdigits, semicolon)) -> Char.chr(int_of_string ("0x" ^ (list_to_string hexdigits))));; (*converting
 															  hexdigits to their
 															  real char value 
-															  (from ascii table)
-															*)
-    
+															  from ascii table
+														    *)
+
+(* we return chars(really chars) and not Char (sexp chars) so that we can cuild the whole string from whose chars *)
 let stringMetaChar =
-  let parser = disj_list [word "\\"; (*CHEK ME*) (*TODO: in the table in the assignment they say that ther's also \nul ???? CHECK*)
-			  word "\""; (*CHEK ME TOO PAPA!!! :-( *)
-			  word "\t";
-			  word "\nul";
-			  word "\f";
-			  word "\n";
-			  word "\r"
-			 ] in
-			 pack parser (fun chlist -> match chlist with
-			 | ['\\'; '\\'] -> Char(Char.chr(92))
-			 | ['\\'; 't'] -> Char(Char.chr(9))
-			 | ['\\'; 'T']-> Char(Char.chr(9))
-			 | ['\\'; 'n'; 'u'; 'l'] ->  Char(Char.chr(0)) (*again the same prob. like in namedCharParser NUL/nUL etc. *)
-			 | ['\\'; '"'] ->  Char(Char.chr(34))
-			 | ['\\'; 'f'] ->  Char(Char.chr(12))
-			 | ['\\'; 'F'] ->  Char(Char.chr(12))
-			 | ['\\'; 'n'] ->  Char(Char.chr(10))
-			 | ['\\'; 'N'] ->  Char(Char.chr(10))
-			 | ['\\'; 'r'] ->  Char(Char.chr(13))
-			 | ['\\'; 'R'] ->  Char(Char.chr(13))
-			 | _ -> Char('\000') (* I wanted to throw an exception but it didn't let me; anyway this case never happens *)
-			 );;
+  let list = List.map (fun str -> word_ci str) ["\\"; "\""; "\t"; "\nul"; "\f"; "\n"; "\r"] in (* CHEK doublebackslash and backslashquote
+												  TODO: in the table 
+												  in the assignment they
+												  say that ther's also
+												  \nul ???? CHECK *)
+  let parser = disj_list list in
+  pack parser (fun chlist -> match chlist with
+  | ['\\'; '\\'] -> Char.chr(92)
+  | ['\\'; 't'] -> Char.chr(9)
+  | ['\\'; 'T']-> Char.chr(9)
+  | ['\\'; 'n'; 'u'; 'l'] ->  Char.chr(0) (*again the same prob. like in namedCharParser NUL/nUL etc. *)
+  | ['\\'; '"'] ->  Char.chr(34)
+  | ['\\'; 'f'] ->  Char.chr(12)
+  | ['\\'; 'F'] ->  Char.chr(12)
+  | ['\\'; 'n'] ->  Char.chr(10)
+  | ['\\'; 'N'] ->  Char.chr(10)
+  | ['\\'; 'r'] ->  Char.chr(13)
+  | ['\\'; 'R'] ->  Char.chr(13)
+  | _ -> Char.chr(0) (* I wanted to throw an exception but it didn't let me; anyway this case never happens *)
+  );;
 
 let stringCharParser = disj_list [stringLiteralChar; stringHexChar; stringMetaChar];; (*the result is already a Char
 											because we packed each sub-parser*)
 let string_parser =
-  let quote = char '"' in
+  let quote = char '\"' in
   let parser = caten quote (caten (star stringCharParser) quote) in
   pack parser (fun (q1, (chars, q2)) -> String(list_to_string chars));;
+
+(*let string_parser =
+  let parser = star stringCharParser in
+  pack parser (fun (e) -> String(list_to_string e));; *)
+
 (*string paeser END*)
 
 (*--------tests--------*)
 
+(*regular string test*)
+(*let str = Char.escaped('"') ^ "hello" ^ Char.escaped('"');;*)
+let str2 = "\"hello\"";;
+print_string str2;;
+trace_pc "strings parser" string_parser (string_to_list "\"hello\"");;
+(*let (e, s) = string_parser (string_to_list str);; (*there's no match because in "hello" the quotes  belong
+							to ocaml but we need 2 more quotes: ""hello""
+							(the second cpuple belongs to scheme input *)
+let x = String("hello");;
+  print_string (string_of_bool (sexpr_eq x e));;*)
+
+(*hex string test*)
+let (e, s) = string_parser (string_to_list "\x30");; 
+let x = String("0");;
+print_string (string_of_bool (sexpr_eq x e));;
+
+(*hex string test - DOESN'T WORK!!!*)
+let (e, s) = string_parser (string_to_list "\n");; 
+let x = String(Char.escaped (Char.chr(10)));;
+print_string (string_of_bool (sexpr_eq x e));;
 
 (*---char tests---*)
 (*let (e,s) = char_parser (string_to_list "#\a");;
