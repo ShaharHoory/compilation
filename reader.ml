@@ -77,17 +77,17 @@ let visibleSimpleCharParser =
   let simpleParser = PC.const (fun ch -> ch > ' ') in
   PC.pack simpleParser (fun (ch) -> Char(ch));;
 
-(*problem with inputs like "TAB" fix this *)
+(*problem with inputs like "TAB" fix this-update: i foext this, need to check*)
 let namedCharParser =
   let wordsParsersList = List.map (fun str -> word_ci str) ["newline"; "nul"; "page"; "return"; "tab"; "space"] in
   let disjParser = PC.disj_list wordsParsersList in
-  PC.pack disjParser (fun (e) -> match e with
-  | ['n'; 'u'; 'l'] -> Char('\000')
-  | ['n'; 'e'; 'w'; 'l'; 'i'; 'n'; 'e'] -> Char('\012')
-  | ['p'; 'a'; 'g'; 'e'] -> Char('\014')
-  | ['r'; 'e'; 't'; 'u'; 'r'; 'n'] -> Char('\015')
-  | ['t'; 'a'; 'b'] -> Char('\011')
-  | ['s'; 'p'; 'a'; 'c'; 'e'] -> Char('\040')
+  PC.pack disjParser (fun (e) -> match (list_to_string (List.map lowercase_ascii e)) with
+  | "nul" -> Char('\000')
+  | "newline"-> Char('\012')
+  | "page" -> Char('\014')
+  | "return" -> Char('\015')
+  | "tab" -> Char('\011')
+  | "space" -> Char('\040')
   | _ -> Char('\000') (* I wanted to throw an exception but it didn't let me; anyway this case never happens *)
   );;
 
@@ -192,18 +192,14 @@ let stringMetaChar =
 												  say that ther's also
 												  \nul ???? CHECK *)
   let parser = disj_list list in
-  pack parser (fun chlist -> match chlist with
-  | ['\\'; '\\'] -> Char.chr(92)
-  | ['\\'; 't'] -> Char.chr(9)
-  | ['\\'; 'T']-> Char.chr(9)
-  | ['\\'; 'n'; 'u'; 'l'] ->  Char.chr(0) (*again the same prob. like in namedCharParser NUL/nUL etc. *)
-  | ['\\'; '"'] ->  Char.chr(34)
-  | ['\\'; 'f'] ->  Char.chr(12)
-  | ['\\'; 'F'] ->  Char.chr(12)
-  | ['\\'; 'n'] ->  Char.chr(10)
-  | ['\\'; 'N'] ->  Char.chr(10)
-  | ['\\'; 'r'] ->  Char.chr(13)
-  | ['\\'; 'R'] ->  Char.chr(13)
+  pack parser (fun chlist -> match (list_to_string (List.map lowercase_ascii chlist)) with
+  | "\\" -> Char.chr(92)
+  | "\t" -> Char.chr(9)
+  | "\nul" ->  Char.chr(0) (*again the same prob. like in namedCharParser NUL/nUL etc. - I FIXED IT, NEED TO CHECK CHECK!!!*)
+  | "\"" ->  Char.chr(34)
+  | "\f" ->  Char.chr(12)
+  | "\n" ->  Char.chr(10)
+  | "\r" ->  Char.chr(13)
   | _ -> Char.chr(0) (* I wanted to throw an exception but it didn't let me; anyway this case never happens *)
   );;
 
