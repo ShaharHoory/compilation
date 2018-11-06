@@ -7,6 +7,8 @@
 
 #use "pc.ml";;
 
+open PC
+
 exception X_not_yet_implemented;;
 exception X_this_should_not_happen;;
   
@@ -56,8 +58,8 @@ end;; (* struct Reader *)
 
 (*boolean works!*)
 let _boolean_parser_ =
-let parser =  PC.disj (PC.word_ci "#t") (PC.word_ci "#f") in 
-PC.pack parser (fun (b)->if (list_to_string b) = "#t" then Bool(true) else Bool(false));;
+  let parser =  PC.disj (PC.word_ci "#t") (PC.word_ci "#f") in 
+  PC.pack parser (fun (b)->if (list_to_string b) = "#t" then Bool(true) else Bool(false));;
 
 (*START char parsering*)
 let _digit_  = PC.range '0' '9';;
@@ -67,20 +69,36 @@ let a_to_F_ = PC.range 'A' 'F';;
 let hexDigitParser = PC.disj _digit_ (PC.disj a_to_f_ a_to_F_);; 
 
 
-let char_prefix = PC.word "#/" ;; (* need to check this!!! problem with meta char "/" !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! *)
+let char_prefix = PC.word "#\\" ;; (* need to check this!!! problem with meta char "/" !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! *)
 let hex_prefix = PC.word "#x";;
 let hex_natural = PC.plus hexDigitParser;;
 
-let visibleSimpleCharParser = PC.const (fun ch -> ch > ' ');;
-let namedCharParser = PC.disj (PC.word_ci "newline") (PC.disj (PC.word_ci "nul") (PC.disj (PC.word_ci "page")(PC.disj (PC.word_ci "return")
-														(PC.disj (PC.word_ci "space") (PC.word_ci "tab")))));;
+let visibleSimpleCharParser =
+  let simpleParser = PC.const (fun ch -> ch > ' ') in
+  PC.pack simpleParser (fun (ch) -> Char(ch));;
 
-let hexCharParser = PC.caten (PC.char_ci 'x') (PC.plus hexDigitParser);;
+(*problem with inputs like "TAB" fix this *)
+let namedCharParser =
+  let wordsParsersList = List.map (fun str -> word_ci str) ["newline"; "nul"; "page"; "return"; "tab"; "space"] in
+  let disjParser = PC.disj_list wordsParsersList in
+  PC.pack disjParser (fun (e) -> match e with
+  | ['n'; 'u'; 'l'] -> Char('\000')
+  | ['n'; 'e'; 'w'; 'l'; 'i'; 'n'; 'e'] -> Char('\012')
+  | ['p'; 'a'; 'g'; 'e'] -> Char('\014')
+  | ['r'; 'e'; 't'; 'u'; 'r'; 'n'] -> Char('\015')
+  | ['t'; 'a'; 'b'] -> Char('\011')
+  | ['s'; 'p'; 'a'; 'c'; 'e'] -> Char('\040')
+  | _ -> Char('\000') (* I wanted to throw an exception but it didn't let me; anyway this case never happens *)
+  );;
 
-(*let char_parser =
-  let parser = PC.caten char_prefix (PC.disj visibleSimpleCharParser (PC.disj namedCharParser hexCharParser)) in
-      PC.pack parser (fun (pref, ch) -> Char(ch));;
-*)
+let hexCharParser =
+  let parser = PC.caten (PC.char_ci 'x') (PC.plus hexDigitParser) in
+  PC.pack parser (fun (x, ch) -> Char(Char.chr(int_of_string ("0x" ^ (list_to_string ch)))));;
+
+let char_parser =
+  let parser = PC.caten char_prefix (PC.disj_list [hexCharParser; namedCharParser; visibleSimpleCharParser]) in   
+  PC.pack parser (fun (pref, ch) -> ch);;   (*No need to use Char constructor because in all the sub-parsers
+					      we do this so ch is already Char*)
 (*END char parsering*)
 
 let _natural_ = PC.plus _digit_;; 
@@ -126,40 +144,14 @@ let _hex_float =
 (*number works! *)
 let _number_ = PC.disj (PC.disj (PC.disj _hex_float _float_) _hex_integer) _integer_ ;;
 
-let _sexpr_ =  PC.disj _boolean_parser_ _number_;;
-
-(*quotes works! *)
-let _quoted_ = 
-let parser = PC.caten (PC.char '\'') _sexpr_ in
-PC.pack parser (fun (c,e)-> Pair(Symbol("quote"), Pair(e, Nil)));; 
-
-let _quasi_quoted_ = 
-let parser = PC.caten (PC.char '`') _sexpr_ in
-PC.pack parser (fun (c,e)-> Pair(Symbol("quasiquote"), Pair(e, Nil)));;                
-
-let _unquote_spliced_ = 
-let parser = PC.caten (PC.char ',') _sexpr_ in
-PC.pack parser (fun (c,e)-> Pair(Symbol("unquote-splicing"), Pair(e, Nil)));;                
-
-let _unquoted_ = 
-let parser = PC.caten (PC.word_ci ",@") _sexpr_ in
-PC.pack parser (fun (c,e)-> Pair(Symbol("unquote"), Pair(e, Nil)));;                
-
 
 (*tests*)
 
-let (e, s) =  _unquoted_ (string_to_list ",@#tfx1.3ab #t #f hh\n");;
+let (e, s) = char_parser "#/a";;
 
-print_string (list_to_string s);;
-let b = Bool(true);;
-let x =  Pair(Symbol("unquote"), Pair(Bool(true), Nil));;
-print_string (string_of_bool (sexpr_eq x e));
-
-(*let f e = match e with
-|Number(Float(e_f)) -> print_float e_f
-| _ -> print_string "pr"
-
-f e;;*)
+print_string (e);;
 (*let b = Bool(false);;
 let x = Number(Int(5));;
   print_string (string_of_bool (sexpr_eq b e));*)
+
+
