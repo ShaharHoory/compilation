@@ -166,7 +166,7 @@ let symbolChar = PC.disj_list [_digit_; _a_to_z; _A_to_Z;
 			      ];;
 let symbol_parser =
   let symbolCharsParser = PC.plus symbolChar in
-  PC.pack symbolCharsParser (fun s -> Symbol(String.lowercase (list_to_string s)));;
+  PC.pack symbolCharsParser (fun s -> Symbol((list_to_string (List.map lowercase_ascii s))));;
 (*symbol parser END*)
 
 (*string parser START*)
@@ -186,16 +186,11 @@ let stringHexChar =
 
 (* we return chars(really chars) and not Char (sexp chars) so that we can cuild the whole string from whose chars *)
 let stringMetaChar =
-  let list = List.map (fun str -> word_ci str) ["\\"; "\""; "\t"; "\nul"; "\f"; "\n"; "\r"] in (* CHEK doublebackslash and backslashquote
-												  TODO: in the table 
-												  in the assignment they
-												  say that ther's also
-												  \nul ???? CHECK *)
+  let list = List.map (fun str -> word_ci str) ["\\"; "\""; "\t"; "\f"; "\n"; "\r"] in (* CHEK doublebackslash and backslashquote*)
   let parser = disj_list list in
   pack parser (fun chlist -> match (list_to_string (List.map lowercase_ascii chlist)) with
   | "\\" -> Char.chr(92)
-  | "\t" -> Char.chr(9)
-  | "\nul" ->  Char.chr(0) (*again the same prob. like in namedCharParser NUL/nUL etc. - I FIXED IT, NEED TO CHECK CHECK!!!*)
+  | "\t" -> Char.chr(9) (*again the same prob. like in namedCharParser NUL/nUL etc. - I FIXED IT, NEED TO CHECK CHECK!!!*)
   | "\"" ->  Char.chr(34)
   | "\f" ->  Char.chr(12)
   | "\n" ->  Char.chr(10)
