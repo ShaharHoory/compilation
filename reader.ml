@@ -50,6 +50,23 @@ let normalize_scheme_symbol str =
 	s) then str
   else Printf.sprintf "|%s|" str;;
 
+
+(********************************************************************************************************)
+let rec _sexpr_ s = 
+
+let _all_parsers = PC. disj_list _boolean_parser_ :: char_parser_ :: _number :: string_parser :: symbol_parser :: _list_parser :: _dotted_list_parser :: _vector_parser :: 
+
+let _boolean_parser_ =
+  let boolDisj = disj (word_ci "#t") (word_ci "#f") in
+  let parser = caten (caten whitespaces_parser boolDisj) whitespaces_parser in
+  let _packed_ = PC.pack parser (fun ((s1, b), s2)->if (list_to_string (List.map lowercase_ascii b)) = "#t" then Bool(true) else Bool(false)) in
+  _packed_ s
+
+and
+
+ 
+
+
 (*Whitespaces parser*)
 let whitespaces_parser = star nt_whitespace;;
 
@@ -145,7 +162,7 @@ let un_visibleSimpleCharParser =
 let _comment_parser = PC.caten (PC.caten (PC.char ';') (PC.star PC.nt_any)) PC.nt_end_of_input;;
 
 (*identifies all the invisible chars - less than ' ' *)
-let _whitespace_and_co_parser = PC.star un_visibleSimpleCharParser;;
+let _whitespace_and_co_parser = PC.disj (PC.star un_visibleSimpleCharParser) _comment_parser;;
 
 (*need to add parser for commetns *)
 
@@ -294,6 +311,11 @@ let read_sexprs string = raise X_not_yet_implemented;;
 
 
 (*--------tests--------*)
+
+(*comments tests*)
+let (e,s) = _comment_parser (string_to_list ";sgsg\n h");;
+print_string(list_to_string s);;
+
 (*Boolean tests*)
 
 (*
