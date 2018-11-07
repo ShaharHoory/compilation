@@ -197,15 +197,15 @@ let stringHexChar =
 
 (* we return chars(really chars) and not Char (sexp chars) so that we can cuild the whole string from whose chars *)
 let stringMetaChar =
-  let list = List.map (fun str -> word_ci str) ["\\"; "\""; "\\t"; "\\f"; "\\n"; "\\r"] in (* CHEK doublebackslash and backslashquote*)
+  let list = List.map (fun str -> word_ci str) ["\\\\"; "\\\""; "\\t"; "\\f"; "\\n"; "\\r"] in (* CHEK doublebackslash and backslashquote*)
   let parser = disj_list list in
   pack parser (fun chlist -> match (list_to_string (List.map lowercase_ascii chlist)) with
-  | "\\" -> Char.chr(92)
-  | "\\t" -> Char.chr(9) (*again the same prob. like in namedCharParser TAB/tAB etc. - I FIXED IT, NEED TO CHECK CHECK!!!*)
-  | "\"" ->  Char.chr(34)
+  | "\\\\" -> '\\'
+  | "\\t" -> '\t' (*again the same prob. like in namedCharParser TAB/tAB etc. - I FIXED IT, NEED TO CHECK CHECK!!!*)
+  | "\\\"" ->  '\"'
   | "\\f" ->  Char.chr(12)
-  | "\\n" ->  Char.chr(10)
-  | "\\r" ->  Char.chr(13)
+  | "\\n" ->  '\n'
+  | "\\r" ->  '\r'
   | _ -> Char.chr(0) (* I wanted to throw an exception but it didn't let me; anyway this case never happens *)
   );;
 
@@ -213,12 +213,8 @@ let stringCharParser = disj_list [stringMetaChar; stringLiteralChar; stringHexCh
 
 let string_parser =
   let quote = char '\"' in
-  let parser = caten quote (caten (star stringCharParser) quote) in
-  pack parser (fun (q1, (chars, q2)) -> String(list_to_string chars));;
-
-(*let string_parser =
-  let parser = star stringCharParser in
-  pack parser (fun (e) -> String(list_to_string e));; JUST FOR TESTING *)
+  let parser = caten (caten quote (star stringCharParser)) quote in
+  pack parser (fun ((q1, chars), q2) -> String(list_to_string chars));;
 
 (*string paeser END*)
 
@@ -327,13 +323,12 @@ let tester () =
     (fun () -> test_nt "char test 8" ____Char "#\\space" (Char(' '))) ;
     (fun () -> test_nt "char test 9" ____Char "#\\newline" (Char('\n'))) ;
     (fun () -> test_nt "char test 10" ____Char "#\\\\" (Char('\\'))) ;
-    (* (fun () -> test_nt "string test 1" ____String "\"Hello\"" (String("Hello"))) ;*)
-   (* (fun () -> test_nt "string test 3" ____String "\"Hello World!\"" (String("Hello World!"))); *)
-   (* (fun () -> test_nt "string test 4" ____String "\"Hello\\n World!\"" (String("Hello\n World!"))) ; *)
-    (*(fun () -> test_nt "string test 5" ____String "\"\\t\"" (String("\t"))) ; *)
-   (* (fun () -> test_nt "string test 6" ____String "\"\\\\\"" (String("\\"))) ; *)
-   (* (fun () -> test_nt "string test 7" ____String "\"\"" (String(""))) ; *)
-   
+    (fun () -> test_nt "string test 1" ____String "\"Hello\"" (String("Hello"))) ;
+    (fun () -> test_nt "string test 3" ____String "\"Hello World!\"" (String("Hello World!")));
+    (fun () -> test_nt "string test 4" ____String "\"Hello\\n World!\"" (String("Hello\n World!"))) ;
+    (fun () -> test_nt "string test 5" ____String "\"\\t\"" (String("\t"))) ;
+    (fun () -> test_nt "string test 6" ____String "\"\\\\\"" (String("\\"))) ;
+    (fun () -> test_nt "string test 7" ____String "\"\"" (String(""))) ;
     (fun () -> test_nt "symbol test 1" ____Symbol "wfkjwf" (Symbol("wfkjwf"))) ;
     (fun () -> test_nt "symbol test 2" ____Symbol "23148!" (Symbol("23148!"))) ;
     (fun () -> test_nt "symbol test 3" ____Symbol "x1" (Symbol("x1"))) ;
