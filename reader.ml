@@ -77,8 +77,25 @@ let visibleSimpleCharParser =
   let simpleParser = PC.const (fun ch -> ch > ' ') in
   PC.pack simpleParser (fun (ch) -> Char(ch));;
 
+
+let un_visibleSimpleCharParser =
+  let simpleParser = PC.const (fun ch -> ch <= ' ') in
+  PC.pack simpleParser (fun (ch) -> Char(ch));;
+
+let _comment_parser = PC.caten (PC.caten (PC.char ';') (PC.star PC.nt_any)) PC.nt_end_of_input;;
+
+(*identifies all the invisible chars - less than ' ' *)
+let _whitespace_and_co_parser = PC.star un_visibleSimpleCharParser;;
+
+(*need to add parser for commetns *)
+
+let make_wrapped_with_junk p = 
+let parser = PC.caten (PC.caten _whitespace_and_co_parser p)  _whitespace_and_co_parser in
+PC.pack parser (fun ((jl,p),jr) -> p);;
+
 (*problem with inputs like "TAB" fix this *)
-let namedCharParser =
+
+(*let namedCharParser =
   let wordsParsersList = List.map (fun str -> word_ci str) ["newline"; "nul"; "page"; "return"; "tab"; "space"] in
   let disjParser = PC.disj_list wordsParsersList in
   PC.pack disjParser (fun (e) -> match e with
@@ -91,6 +108,8 @@ let namedCharParser =
   | _ -> Char('\000') (* I wanted to throw an exception but it didn't let me; anyway this case never happens *)
   );;
 
+
+
 let hexCharParser =
   let parser = PC.caten (PC.char_ci 'x') (PC.plus hexDigitParser) in
   PC.pack parser (fun (x, ch) -> Char(Char.chr(int_of_string ("0x" ^ (list_to_string ch)))));;
@@ -100,6 +119,8 @@ let char_parser =
   PC.pack parser (fun (pref, ch) -> ch);;   (*No need to use Char constructor because in all the sub-parsers
 					      we do this so ch is already Char*)
 (*END char parsering*)
+*)
+
 
 let _natural_ = PC.plus _digit_;; 
 let _plus_or_minus_ = PC.disj (PC.char '+') (PC.char '-') ;;
@@ -144,14 +165,49 @@ let _hex_float =
 (*number works! *)
 let _number_ = PC.disj (PC.disj (PC.disj _hex_float _float_) _hex_integer) _integer_ ;;
 
+let _l_paren = PC.char '(';;
+let _r_paren = PC.char ')';;
+let _sexpr_ = PC.disj _number_ _boolean_parser_ ;;
+
+
+let rec convert_to_nested_pair sexpr_list = match sexpr_list with
+| [] -> Nil
+| head::body -> 
+Pair (head, (convert_to_nested_pair body));;
+
+let _list_parser =
+let parser = PC.caten (PC.caten  (make_wrapped_with_junk _l_paren)  (PC.star (make_wrapped_with_junk _sexpr_))) (make_wrapped_with_junk _r_paren) in
+PC.pack parser (fun((l,s),r)-> convert_to_nested_pair s);;
+
+let _dotted_list_parser =
+let parser = PC.caten
+(PC.caten
+ (PC.caten
+  (PC.caten  (make_wrapped_with_junk _l_paren)  (PC.plus (make_wrapped_with_junk _sexpr_))) (PC.char '.')) (make_wrapped_with_junk _sexpr_)) (make_wrapped_with_junk _r_paren) in
+PC.pack parser (fun((((l,p),d),s),r)-> convert_to_nested_pair (p @ [s]));;
+
+let vector_prefix = PC.word "#(";;
+let _vector_parser =
+let parser = PC.caten (PC.caten  (make_wrapped_with_junk vector_prefix)  (PC.star (make_wrapped_with_junk _sexpr_))) (make_wrapped_with_junk _r_paren) in
+PC.pack parser (fun((l,s),r)->  Vector(s));;
+
 
 (*tests*)
 
-let (e, s) = char_parser "#/a";;
+let (e, s) = _comment_parser (string_to_list  ";xfnxn\nabc");;
+(*let result = Pair( (Bool(true)) ,(Pair (Bool(false)), (Pair ((Bool(true)), Nil))));;
+      *)
 
-print_string (e);;
+print_string(list_to_string s);;
+let result = Pair (Bool(false), Pair (Bool(true), Pair(Bool(false),  Nil)));;
+let result2 = Vector(Bool(false) ::  Bool(true) :: Bool(false) :: []);;
+
+
+let x = '#';;
+
 (*let b = Bool(false);;
 let x = Number(Int(5));;
-  print_string (string_of_bool (sexpr_eq b e));*)
+print_string (string_of_bool (sexpr_eq b e));
+*)
 
 
