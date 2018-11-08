@@ -127,8 +127,7 @@ let char_parser =
 let un_visibleSimpleCharParser =
   let simpleParser = PC.const (fun ch -> ch <= ' ') in
   PC.pack simpleParser (fun (ch) -> Char(ch));;
-
-let _comment_parser = PC.caten (PC.caten (PC.char ';') (PC.star PC.nt_any)) PC.nt_end_of_input;;
+  
 
 (*identifies all the invisible chars - less than ' ' *)
 let _whitespace_and_co_parser = PC.star un_visibleSimpleCharParser ;;
@@ -340,6 +339,20 @@ and _scientific_notation_ s =
   _packed_ s;;
 
 
+(*COMMENTS PARSEERS*)
+(*let _comment_parser =
+  let newLineChar = char_ci '\n' in
+  let oneLineChars = star (diff nt_any newLineChar) in
+  let endOfComment = disj newLineChar nt_end_of_input in (*FIX HERE*)
+  PC.caten (PC.caten (PC.char ';') oneLineChars) endOfComment;; *)
+
+(*
+let _sexpr_comment_parser_ =
+  let prefix = caten (char ';') (char '#') in
+  let parser = caten prefix _sexpr_ in
+(*I DONT UNDERSTAND WHAT SEXPR COMMENT SHOULD RETURN :( *)
+*)
+
 (**********************************************************************************************************************************************************************)
 
 
@@ -347,12 +360,20 @@ and _scientific_notation_ s =
 
 
 (*--------tests--------*)
-
+(*comments test*)
+(*
+let (e, s) =  _sexpr_comment_parser_ (string_to_list ";##f#t");;
+let x = Bool(true);;
+print_string (string_of_bool (sexpr_eq x e));;
+*)
 
 (*scientific notation tests*)
+(*
 let (e, s) = _scientific_notation_ (string_to_list "100e-1");;
 let x = Number(Float(10.0));;
 print_string (string_of_bool (sexpr_eq x e));;
+*)
+
 (*Boolean tests*)
 
 (*
