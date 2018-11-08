@@ -225,13 +225,6 @@ let stringCharParser = disj_list [stringMetaChar; stringLiteralChar; stringHexCh
 (*string paeser END*)
 
 
-(*Comments Parser START*)
-(*let line_comments_parser =
-  let semiColonParser = char ';' in
-  pack semiColonParser (fun (sc, rest) -> *)
-  
-(*Comments parser END*)
-
 let read_sexpr string =raise X_not_yet_implemented;;
 (*  let (e, s) = (disj_list [_boolean_parser_; char_parser; _number_; symbol_parser; string_parser]) (string_to_list string) in
   e;;
@@ -254,12 +247,10 @@ let parser =  PC.not_followed_by p  (PC.diff (PC.diff PC.nt_any PC.nt_whitespace
 
 
 let rec _sexpr_ s = 
-
-spaced_parser _unquote_spliced_ :: spaced_parser _unquoted_ ::spaced_parser _scientific_notation_ :: [])
-let _all_parsers = PC.disj_list (spaced_parser _boolean_parser_ :: spaced_parser char_parser :: spaced_parser  _list_parser ::
+let _all_parsers = PC.disj_list (spaced_parser _boolean_parser_ :: spaced_parser char_parser ::
 spaced_parser _number_ :: spaced_parser string_parser :: spaced_parser symbol_parser :: spaced_parser  _list_parser :: 
 spaced_parser _dotted_list_parser :: spaced_parser _vector_parser :: spaced_parser _quoted_ :: spaced_parser _quasi_quoted_ ::
-spaced_parser _unquote_spliced_ :: spaced_parser _unquoted_ :: [])
+spaced_parser _unquote_spliced_ :: spaced_parser _unquoted_ :: spaced_parser _scientific_notation_ :: [])
 in _all_parsers s
 
 and char_parser s =
@@ -291,7 +282,8 @@ and symbol_parser s =
   _packed_ s
   
 and _list_parser s =
-  let parser = PC.caten (PC.caten  (make_wrapped_with_junk _l_paren)  (PC.star (make_wrapped_with_junk _sexpr_))) (make_wrapped_with_junk _r_paren) in
+  let parser = PC.caten (PC.caten  (make_wrapped_with_junk _l_paren)  (PC.star (make_wrapped_with_junk _sexpr_)))
+                        (make_wrapped_with_junk _r_paren) in
   let _packed_ = PC.pack parser (fun((l,s),r)-> convert_to_nested_pair s) in
   _packed_ s
 
@@ -304,7 +296,8 @@ and _dotted_list_parser s =
   _packed_ s
 
 and _vector_parser s =
-  let parser = PC.caten (PC.caten  (make_wrapped_with_junk vector_prefix)  (PC.star (make_wrapped_with_junk _sexpr_))) (make_wrapped_with_junk _r_paren) in
+  let parser = PC.caten (PC.caten  (make_wrapped_with_junk vector_prefix)  (PC.star (make_wrapped_with_junk _sexpr_)))
+                        (make_wrapped_with_junk _r_paren) in
   let _packed_ = PC.pack parser (fun((l,s),r)->  Vector(s)) in
   _packed_ s
     
