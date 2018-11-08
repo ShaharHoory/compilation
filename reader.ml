@@ -76,13 +76,6 @@ let symbolChar = PC.disj_list [_digit_; _a_to_z; _A_to_Z;
 
 (*symbol parser END*)
 
-(*boolean works!*)
-(* let _boolean_parser_ =  *****BOOLEAN VERSION 2 WITH NOT FOLLOWED BY *****
-  let boolDisj = disj (word_ci "#t") (word_ci "#f") in
-  let parser = caten (caten whitespaces_parser boolDisj) whitespaces_parser in
-  let packedParser = PC.pack parser (fun ((s1, b), s2)->if (list_to_string b) = "#t" then Bool(true) else Bool(false)) in
-  not_followed_by packedParser symbol_parser
-;; *)
 
   
 (*START char parsering*)
@@ -251,13 +244,21 @@ let read_sexprs string = raise X_not_yet_implemented;;
     | _ -> read_sexprs s;; *) (*JUST AN UNSECCESFULL TRYING*)
 
 
+
+let spaced_parser p = 
+let parser =  PC.not_followed_by p  (PC.diff (PC.diff PC.nt_any PC.nt_whitespace) _r_paren)  in
+ make_wrapped_with_junk parser;;
+
+
 (**********************************************************************************************************************************************************************)
 
 
 let rec _sexpr_ s = 
 
-let _all_parsers = PC.disj_list (_boolean_parser_ :: char_parser ::  _list_parser ::
-_number_ :: string_parser :: symbol_parser :: _list_parser :: _dotted_list_parser :: _vector_parser :: _quoted_ :: _quasi_quoted_ :: _unquote_spliced_ :: _unquoted_ :: [])
+let _all_parsers = PC.disj_list (spaced_parser _boolean_parser_ :: spaced_parser char_parser :: spaced_parser  _list_parser ::
+spaced_parser _number_ :: spaced_parser string_parser :: spaced_parser symbol_parser :: spaced_parser  _list_parser :: 
+spaced_parser _dotted_list_parser :: spaced_parser _vector_parser :: spaced_parser _quoted_ :: spaced_parser _quasi_quoted_ ::
+spaced_parser _unquote_spliced_ :: spaced_parser _unquoted_ :: [])
 in _all_parsers s
 
 and char_parser s =
@@ -269,8 +270,7 @@ in _packed_ s
 
 and _boolean_parser_ s =
   let boolDisj = disj (word_ci "#t") (word_ci "#f") in
-  let parser = caten (caten whitespaces_parser boolDisj) whitespaces_parser in
-  let _packed_ = PC.pack parser (fun ((s1, b), s2)->if (list_to_string (List.map lowercase_ascii b)) = "#t" then Bool(true) else Bool(false)) in
+  let _packed_ = PC.pack boolDisj (fun (b)->if (list_to_string (List.map lowercase_ascii b)) = "#t" then Bool(true) else Bool(false)) in
   _packed_ s
 
 and _number_ s =
@@ -332,15 +332,12 @@ _packed_ s;;
 
 (**********************************************************************************************************************************************************************)
 
-let (e,s) = _sexpr_ (string_to_list "(12 #t . #f)");;
-let x = Pair(Number(Int(12)), Pair( Bool(true) ,Pair ( Bool(false), Nil)));;
-print_string (string_of_bool  (sexpr_eq x e));; 
+
+
+
 
 (*--------tests--------*)
 
-(*comments tests*)
-let (e,s) = _comment_parser (string_to_list ";sgsg\n h");;
-print_string(list_to_string s);;
 
 (*Boolean tests*)
 
@@ -350,98 +347,6 @@ let x = Bool(true);;
 print_string (string_of_bool (sexpr_eq x e));;
 *)
 
-
-(*NADAVS TESTS STARS*)
-(* USAGE: change the value of the parsers below,
- to the names of your parsers.
- These parsers are according to the CFG, with the addition of line and sexpr comments  *)
-let nt_not_implemented = nt_none;;
-
-let ____Bool = _boolean_parser_ ;;
-let ____Number = _number_ ;;
-let ____Char = char_parser;;
-let ____String = string_parser ;;
-let ____Symbol = symbol_parser ;;
-let ____List = nt_not_implemented ;;
-let ____Dotted_List = nt_not_implemented ;;
-let ____Vector = nt_not_implemented ;;
-let ____Qouted = nt_not_implemented ;;
-let ____QuasiQuoted = nt_not_implemented ;;
-let ____Unquoted = nt_not_implemented ;;
-let ____UnquoteAndSpliced = nt_not_implemented ;;
-let ____Sexpr = nt_not_implemented ;;
-
-
-
-let test_nt doc_string nt input_string expected_value =
-  try
-    let (result, remaining_chars) = (nt (string_to_list input_string)) in
-    if (result = expected_value)
-    then if remaining_chars <> []
-	 then Printf.printf
-		"!!! test %s gave correct value, with remaining chars -->[%s]\n"
-		doc_string
-		(list_to_string remaining_chars)
-	 else ()
-    else Printf.printf "!!! test %s gave an incorrect value\n" doc_string
-  with X_not_yet_implemented ->
-    Printf.printf "!!! test %s failed\n" doc_string;;
-
-let rec run_tests tests =
-  match tests with
-  |[] -> ()
-  | test :: tests ->
-     (test(); run_tests tests);;
-
-let tester () =
-  run_tests
-    [(fun () -> test_nt "boolean test 1" ____Bool "#t" (Bool(true))) ;
-    (fun () -> test_nt "boolean test 2" ____Bool "#T" (Bool(true))) ;
-    (fun () -> test_nt "boolean test 3" ____Bool "#f" (Bool(false))) ;
-    (fun () -> test_nt "boolean test 4" ____Bool "#F" (Bool(false))) ;
-    (fun () -> test_nt "number test 1" ____Number "1" (Number(Int(1)))) ;
-    (fun () -> test_nt "number test 2" ____Number "01290" (Number(Int(1290))));
-    (fun () -> test_nt "number test 3" ____Number "-10" (Number(Int(-10))));
-    (fun () -> test_nt "number test 4" ____Number "-03" (Number(Int(-3))));
-    (fun () -> test_nt "number test 5" ____Number "-0" (Number(Int(0))));
-    (fun () -> test_nt "number test 6" ____Number "+8" (Number(Int(8))));
-    (fun () -> test_nt "number test 7" ____Number "#x16" (Number(Int(22))));
-    (fun () -> test_nt "number test 8" ____Number "#xabfd" (Number(Int(44029))));
-    (fun () -> test_nt "number test 10" ____Number "#x-1a" (Number(Int(-26))));
-    (fun () -> test_nt "number test 11" ____Number "#x+1a" (Number(Int(26))));
-    (fun () -> test_nt "number test 12" ____Number "1.0" (Number(Float(1.0))));
-    (fun () -> test_nt "number test 13" ____Number  "0005.0129" (Number(Float(5.0129)))) ;
-    (* (fun () -> test_nt "number test 14" ____Number  "501.100000000000000000000" (Number(Float(501.1))));(*FAIL-EXCEPTION int_of_string*)*)
-    (fun () -> test_nt "number test 16" ____Number  "-0.0" (Number(Float(0.0)))) ; (*PASS PASS ITS A GOAL *)
-    (fun () -> test_nt "number test 17" ____Number  "+999.12349999999" (Number(Float(999.12349999999)))) ; (*PASS PASS ITS A COME*)
-    (fun () -> test_nt "number test 18" ____Number  "-102.000000000000001" (Number(Float(-102.)))) ; (*PASSS PASS*)
-    (*(fun () -> test_nt "number test 19" ____Number  "#x1.ab" (Number(Float(1.66796875)))) ; (*FAIL different result*) *)
-    (fun () -> test_nt "number test 20" ____Number  "#x+a.0" (Number(Float(10.0)))) ; (*PASSSS*)
-    (*(fun () -> test_nt "number test 21" ____Number  "#x-1.ab000000000" (Number(Float(-1.66796875)))) ; (*FAIL different result*) *)
-    (fun () -> test_nt "char test 1" ____Char "#\\a" (Char('a'))) ;
-    (fun () -> test_nt "char test 2" ____Char "#\\A" (Char('A'))) ;
-    (fun () -> test_nt "char test 3" ____Char "#\\?" (Char('?'))) ;
-    (fun () -> test_nt "char test 4" ____Char "#\\~" (Char('~'))) ;
-    (fun () -> test_nt "char test 5" ____Char "#\\x30" (Char('0'))) ;
-    (fun () -> test_nt "char test 6" ____Char "#\\xa" (Char('\n'))) ;
-    (fun () -> test_nt "char test 7" ____Char "#\\tab" (Char('\t'))) ;
-    (fun () -> test_nt "char test 8" ____Char "#\\space" (Char(' '))) ;
-    (fun () -> test_nt "char test 9" ____Char "#\\newline" (Char('\n'))) ;
-    (fun () -> test_nt "char test 10" ____Char "#\\\\" (Char('\\'))) ;
-    (fun () -> test_nt "string test 1" ____String "\"Hello\"" (String("Hello"))) ;
-    (fun () -> test_nt "string test 3" ____String "\"Hello World!\"" (String("Hello World!")));
-    (fun () -> test_nt "string test 4" ____String "\"Hello\\n World!\"" (String("Hello\n World!"))) ;
-    (fun () -> test_nt "string test 5" ____String "\"\\t\"" (String("\t"))) ;
-    (fun () -> test_nt "string test 6" ____String "\"\\\\\"" (String("\\"))) ;
-    (fun () -> test_nt "string test 7" ____String "\"\"" (String(""))) ;
-    (fun () -> test_nt "symbol test 1" ____Symbol "wfkjwf" (Symbol("wfkjwf"))) ;
-    (fun () -> test_nt "symbol test 2" ____Symbol "23148!" (Symbol("23148!"))) ;
-    (fun () -> test_nt "symbol test 3" ____Symbol "x1" (Symbol("x1"))) ;
-    (fun () -> test_nt "symbol test 4" ____Symbol "lambda" (Symbol "lambda" )) ;
-    (fun () -> test_nt "symbol test 5" ____Symbol "define" (Symbol("define")))
-    ];;
-tester ();;
-(*NADAVS TESTS END*)
 
 (*regular string test*)
 (*
@@ -494,3 +399,5 @@ print_string (string_of_bool (sexpr_eq b e));
 *)
 
 end;; (* struct Reader *) (*MOVE ME TO BEFORE TESTS*)
+
+
