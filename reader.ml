@@ -255,6 +255,7 @@ let parser =  PC.not_followed_by p  (PC.diff (PC.diff PC.nt_any PC.nt_whitespace
 
 let rec _sexpr_ s = 
 
+spaced_parser _unquote_spliced_ :: spaced_parser _unquoted_ ::spaced_parser _scientific_notation_ :: [])
 let _all_parsers = PC.disj_list (spaced_parser _boolean_parser_ :: spaced_parser char_parser :: spaced_parser  _list_parser ::
 spaced_parser _number_ :: spaced_parser string_parser :: spaced_parser symbol_parser :: spaced_parser  _list_parser :: 
 spaced_parser _dotted_list_parser :: spaced_parser _vector_parser :: spaced_parser _quoted_ :: spaced_parser _quasi_quoted_ ::
@@ -265,9 +266,9 @@ and char_parser s =
   let parser = PC.caten char_prefix (PC.disj_list [hexCharParser; namedCharParser; visibleSimpleCharParser]) in   
   let _packed_ = PC.pack parser (fun (pref, ch) -> ch)   (*No need to use Char constructor because in all the sub-parsers
 							      we do this so ch is already Char*)
-in _packed_ s
+  in _packed_ s
 
-
+  
 and _boolean_parser_ s =
   let boolDisj = disj (word_ci "#t") (word_ci "#f") in
   let _packed_ = PC.pack boolDisj (fun (b)->if (list_to_string (List.map lowercase_ascii b)) = "#t" then Bool(true) else Bool(false)) in
@@ -290,44 +291,60 @@ and symbol_parser s =
   _packed_ s
   
 and _list_parser s =
-let parser = PC.caten (PC.caten  (make_wrapped_with_junk _l_paren)  (PC.star (make_wrapped_with_junk _sexpr_))) (make_wrapped_with_junk _r_paren) in
-let _packed_ = PC.pack parser (fun((l,s),r)-> convert_to_nested_pair s) in
-_packed_ s
+  let parser = PC.caten (PC.caten  (make_wrapped_with_junk _l_paren)  (PC.star (make_wrapped_with_junk _sexpr_))) (make_wrapped_with_junk _r_paren) in
+  let _packed_ = PC.pack parser (fun((l,s),r)-> convert_to_nested_pair s) in
+  _packed_ s
 
 and _dotted_list_parser s =
-let parser = PC.caten
-(PC.caten
- (PC.caten
-  (PC.caten  (make_wrapped_with_junk _l_paren)  (PC.plus (make_wrapped_with_junk _sexpr_))) (PC.char '.')) (make_wrapped_with_junk _sexpr_)) (make_wrapped_with_junk _r_paren) in
-let _packed_ = PC.pack parser (fun((((l,p),d),s),r)-> convert_to_nested_pair (p @ [s])) in
-_packed_ s
+  let parser = PC.caten
+    (PC.caten
+       (PC.caten
+	  (PC.caten  (make_wrapped_with_junk _l_paren)  (PC.plus (make_wrapped_with_junk _sexpr_))) (PC.char '.')) (make_wrapped_with_junk _sexpr_)) (make_wrapped_with_junk _r_paren) in
+  let _packed_ = PC.pack parser (fun((((l,p),d),s),r)-> convert_to_nested_pair (p @ [s])) in
+  _packed_ s
 
 and _vector_parser s =
-let parser = PC.caten (PC.caten  (make_wrapped_with_junk vector_prefix)  (PC.star (make_wrapped_with_junk _sexpr_))) (make_wrapped_with_junk _r_paren) in
-let _packed_ = PC.pack parser (fun((l,s),r)->  Vector(s)) in
-_packed_ s
-
+  let parser = PC.caten (PC.caten  (make_wrapped_with_junk vector_prefix)  (PC.star (make_wrapped_with_junk _sexpr_))) (make_wrapped_with_junk _r_paren) in
+  let _packed_ = PC.pack parser (fun((l,s),r)->  Vector(s)) in
+  _packed_ s
+    
 and  _quoted_ s = 
-let parser = PC.caten (PC.char '\'') _sexpr_ in
-let _packed_ = PC.pack parser (fun (c,e)-> Pair(Symbol("quote"), Pair(e, Nil))) in
-_packed_ s
-
+  let parser = PC.caten (PC.char '\'') _sexpr_ in
+  let _packed_ = PC.pack parser (fun (c,e)-> Pair(Symbol("quote"), Pair(e, Nil))) in
+  _packed_ s
+    
 and  _quasi_quoted_ s = 
-let parser = PC.caten (PC.char '`') _sexpr_ in
-let _packed_ = PC.pack parser (fun (c,e)-> Pair(Symbol("quasiquote"), Pair(e, Nil))) in
-_packed_ s                
-
+  let parser = PC.caten (PC.char '`') _sexpr_ in
+  let _packed_ = PC.pack parser (fun (c,e)-> Pair(Symbol("quasiquote"), Pair(e, Nil))) in
+  _packed_ s                
+    
 and _unquote_spliced_ s = 
-let parser = PC.caten (PC.char ',') _sexpr_ in
-let _packed_ = PC.pack parser (fun (c,e)-> Pair(Symbol("unquote-splicing"), Pair(e, Nil))) in
-_packed_ s                
-
+  let parser = PC.caten (PC.char ',') _sexpr_ in
+  let _packed_ = PC.pack parser (fun (c,e)-> Pair(Symbol("unquote-splicing"), Pair(e, Nil))) in
+  _packed_ s                
+    
 and  _unquoted_ s = 
-let parser = PC.caten (PC.word_ci ",@") _sexpr_ in
-let _packed_ = PC.pack parser (fun (c,e)-> Pair(Symbol("unquote"), Pair(e, Nil))) in
-_packed_ s;;
+  let parser = PC.caten (PC.word_ci ",@") _sexpr_ in
+  let _packed_ = PC.pack parser (fun (c,e)-> Pair(Symbol("unquote"), Pair(e, Nil))) in
+  _packed_ s
 
+(*and _scientific_notation_ s =
+  let intOrFloat = disj _integer_ _float_ in
+  let eOrE = char_ci 'e' in
+  let parser = caten_list [intOrFloat; eOrE; _integer_] in
+  let _packed_ = pack parser (fun (base, (e, exponent)) -> Float(base*(10**exponent))) in
+  _packed_ s*)
 
+(*TO NAAMA - this returns always float because scientific notation in Scheme always return floats - TO NAAMA*)
+and _scientific_notation_ s =
+  let intOrFloat = disj _integer_ _float_ in
+  let eOrE = char_ci 'e' in
+  let parser = caten (caten intOrFloat eOrE) _integer_ in
+  let _packed_ = pack parser (fun (((base, e), exponent)) -> match base, exponent with
+    | Number(Float(b)), Number(Int(e)) -> Number(Float(b *. (10.0 ** float_of_int(e))))
+    | Number(Int(b)), Number(Int(e)) -> Number(Float(float_of_int(b) *. (10.0 ** float_of_int(e))))
+    | _ -> raise X_no_match) in
+  _packed_ s;;
 
 
 (**********************************************************************************************************************************************************************)
@@ -339,6 +356,10 @@ _packed_ s;;
 (*--------tests--------*)
 
 
+(*scientific notation tests*)
+let (e, s) = _scientific_notation_ (string_to_list "100e-1");;
+let x = Number(Float(10.0));;
+print_string (string_of_bool (sexpr_eq x e));;
 (*Boolean tests*)
 
 (*
