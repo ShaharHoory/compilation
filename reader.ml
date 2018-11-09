@@ -85,7 +85,7 @@ let a_to_F_ = PC.range 'A' 'F';;
 let hexDigitParser = PC.disj _digit_ (PC.disj a_to_f_ a_to_F_);; 
 
 let char_prefix = PC.word "#\\";; 
-let hex_prefix = PC.word "#x";;
+let hex_prefix = PC.word_ci "#x";;
 let hex_natural = PC.plus hexDigitParser;;
 
 let visibleSimpleCharParser =
@@ -94,7 +94,7 @@ let visibleSimpleCharParser =
 
 let newlineChar = '\n';;
 let nullChar = '\000';;
-let pageChar = '\014';;
+let pageChar = '\012';;
 let returnChar = '\r';;
 let tabChar = '\t';;
 let spaceChar = ' ';;
@@ -224,19 +224,6 @@ let stringCharParser = disj_list [stringMetaChar; stringLiteralChar; stringHexCh
 (*string paeser END*)
 
 
-let read_sexpr string =raise X_not_yet_implemented;;
-(*  let (e, s) = (disj_list [_boolean_parser_; char_parser; _number_; symbol_parser; string_parser]) (string_to_list string) in
-  e;;
-*)
-
-let read_sexprs string = raise X_not_yet_implemented;;
- (* let (e, s) = (disj_list [_boolean_parser_; char_parser; _number_; symbol_parser; string_parser]) (string_to_list string) in
-  match (List.length s) with
-  | 0 -> e
-    | _ -> read_sexprs s;; *) (*JUST AN UNSECCESFULL TRYING*)
-
-
-
 let spaced_parser p = 
 let parser =  PC.not_followed_by p  (PC.diff (PC.diff PC.nt_any PC.nt_whitespace) _r_paren)  in
  make_wrapped_with_junk parser;;
@@ -310,14 +297,14 @@ and  _quasi_quoted_ s =
   let _packed_ = PC.pack parser (fun (c,e)-> Pair(Symbol("quasiquote"), Pair(e, Nil))) in
   _packed_ s                
     
-and _unquote_spliced_ s = 
+and  _unquoted_ s = 
   let parser = PC.caten (PC.char ',') _sexpr_ in
-  let _packed_ = PC.pack parser (fun (c,e)-> Pair(Symbol("unquote-splicing"), Pair(e, Nil))) in
+  let _packed_ = PC.pack parser (fun (c,e)-> Pair(Symbol("unquote"), Pair(e, Nil))) in
   _packed_ s                
     
-and  _unquoted_ s = 
+and _unquote_spliced_ s = 
   let parser = PC.caten (PC.word_ci ",@") _sexpr_ in
-  let _packed_ = PC.pack parser (fun (c,e)-> Pair(Symbol("unquote"), Pair(e, Nil))) in
+  let _packed_ = PC.pack parser (fun (c,e)-> Pair(Symbol("unquote-splicing"), Pair(e, Nil))) in
   _packed_ s
 
 (*TO NAAMA - this returns always float because scientific notation in Scheme always return floats - TO NAAMA*)
@@ -354,16 +341,26 @@ let _sexpr_comment_parser_ =
 (*I DONT UNDERSTAND WHAT SEXPR COMMENT SHOULD RETURN :( *)
 *)
 
+let read_sexpr string =
+  let (sexpr, charlist) = _sexpr_ (string_to_list string) in
+  sexpr;;
+
+let read_sexprs string = raise X_not_yet_implemented;;
+ (* let (e, s) = (disj_list [_boolean_parser_; char_parser; _number_; symbol_parser; string_parser]) (string_to_list string) in
+  match (List.length s) with
+  | 0 -> e
+    | _ -> read_sexprs s;; *) (*JUST AN UNSECCESFULL TRYING*)
+
 (**********************************************************************************************************************************************************************)
 
 
 (*--------tests--------*)
 (*SQUARE BRACKETS NOTATION TESTS*)
 
-let (e1, s1) = _squared_brackets_notation_ (string_to_list "[]");;
-let (e2, s2) = _squared_brackets_notation_ (string_to_list "[#t ]");; (*[#t] without the space doesnt work but it should!!! - FIX*)
+let e1 = read_sexpr "[]";;
+let e2 = read_sexpr "[#t ]";; (*[#t] without the space doesnt work but it should!!! - FIX*)
 let x2 = Pair(Bool(true), Nil);;
-let (e3, s3) = _squared_brackets_notation_ (string_to_list "[#t 1 ]   ");;
+let e3 = read_sexpr "[#t 1 ]   ";;
 let x3 = Pair(Bool(true), Pair(Number(Int(1)), Nil));;
 
 
@@ -386,9 +383,8 @@ print_string (string_of_bool (sexpr_eq x e));;
 *)
 
 (*Boolean tests*)
-
 (*
-let (e, s) = _boolean_parser_ (string_to_list "#t");;
+let (e, s) = _sexpr_ (string_to_list " #t");;
 let x = Bool(true);;
 print_string (string_of_bool (sexpr_eq x e));;
 *)
