@@ -158,7 +158,7 @@ let _float_non_zero =
   PC.pack parser (fun ((i,d),n)-> match i with 
   | Number(Int(i_int)) -> Number(Float(float_of_string ((string_of_int i_int) ^ "." ^ (list_to_string n))))
      (*else Number(Float(-1.0 *. (float_of_string ((string_of_int i_int) ^ "." ^ (list_to_string n)))))*)
-  | _ -> Number(Float(0.0)));;
+  | _ -> raise X_no_match);;
 
 
 let _float_ = disj _float_zero_ _float_non_zero;;
