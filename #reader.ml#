@@ -393,7 +393,7 @@ print_string (string_of_bool (sexpr_eq e x));;
 f e;;
 *)
 
-let e = read_sexpr "(#\\c 37392.39382 37392 \"this\" .  ;324324DSFDSFSD\n  )";;
+let e = read_sexpr "(#\\c 37392.39382 37392 \"this\" .  ;324324DSFDSFSD\n  #t )";;
 
 
 
