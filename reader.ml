@@ -149,13 +149,20 @@ let _integer_ =
 	|None -> Number(Int(int_of_string (list_to_string n))));;
 
 (*this is working, can be written cleaner.. & need to change execption instead last case*)
-let _float_ = 
+let _float_zero_ =
+let parser = PC.caten (PC.word "-0.") _natural_ in
+PC.pack parser (fun (i,n)-> Number(Float(float_of_string((list_to_string i) ^ (list_to_string n)))));;
+		    
+let _float_non_zero = 
   let parser = PC.caten (PC.caten _integer_ (PC.char '.'))  _natural_ in
   PC.pack parser (fun ((i,d),n)-> match i with 
-  | Number(Int(i_int)) ->
-     if i_int >0 then  Number(Float((float_of_int i_int) +.10.0**(float_of_int(-1*(List.length n)))*.(float_of_int(int_of_string (list_to_string n)))))
-     else  Number(Float((float_of_int i_int) +. -. 10.0**(float_of_int(-1*(List.length n)))*.(float_of_int(int_of_string (list_to_string n)))))
+  | Number(Int(i_int)) -> Number(Float(float_of_string ((string_of_int i_int) ^ "." ^ (list_to_string n))))
+     (*else Number(Float(-1.0 *. (float_of_string ((string_of_int i_int) ^ "." ^ (list_to_string n)))))*)
   | _ -> Number(Float(0.0)));;
+
+
+let _float_ = disj _float_zero_ _float_non_zero;;
+
 
 (*hex_integer_ works!*)
 let _hex_integer = 
@@ -166,14 +173,17 @@ let _hex_integer =
     else Number(Int(int_of_string ("0x" ^ (list_to_string n))))
   |None -> Number(Int(int_of_string ("0x" ^ (list_to_string n)))));;
 
-(*hex_float works! need to change the exception *)
-let _hex_float = 
+let _hex_float_non_zero = 
   let parser = PC.caten (PC.caten _hex_integer (PC.char '.')) hex_natural in
   PC.pack parser (fun ((i,d),n) -> match i with
-  |Number(Int(i_int))->
-     if i_int >0 then Number(Float((float_of_int i_int) +. 10.0**(float_of_int(-1*(List.length n)))*.(float_of_int(int_of_string ("0x" ^ (list_to_string n))))))
-     else Number(Float((float_of_int i_int) -. 10.0**(float_of_int(-1*(List.length n)))*.(float_of_int(int_of_string ("0x" ^ (list_to_string n))))))
+  |Number(Int(i_int))-> Number(Float(float_of_string ("0x" ^ (string_of_int i_int) ^ "." ^ (list_to_string n))))
   | _ -> Number(Float(0.0)));;
+
+let _hex_float_zero =
+let parser = PC.caten (PC.word_ci "#x-0.") hex_natural in
+PC.pack parser (fun (i,n)-> Number(Float(float_of_string("-0x0." ^ (list_to_string n)))));;
+
+let _hex_float = disj _hex_float_zero _hex_float_non_zero;;
 
 
 let _l_paren = PC.char '(';;
@@ -184,6 +194,10 @@ let rec convert_to_nested_pair sexpr_list = match sexpr_list with
 | head::body -> 
 Pair (head, (convert_to_nested_pair body));;
 
+let rec convert_to_nested_pair_dotted_list sexpr_list sexpr_element = match sexpr_list with
+| [] -> sexpr_element
+|head::body ->
+Pair(head,(convert_to_nested_pair_dotted_list body sexpr_element));;
 
 let vector_prefix = PC.word "#(";;
 
@@ -228,14 +242,16 @@ let parser =  PC.not_followed_by p  (PC.diff (PC.diff PC.nt_any PC.nt_whitespace
  make_wrapped_with_junk parser;;
 
 
+
 (**********************************************************************************************************************************************************************)
 
 
 let rec _sexpr_ s = 
-let _all_parsers = PC.disj_list (spaced_parser _boolean_parser_ :: spaced_parser char_parser ::
-spaced_parser _number_ :: spaced_parser string_parser :: spaced_parser symbol_parser :: spaced_parser  _list_parser :: 
-spaced_parser _dotted_list_parser :: spaced_parser _vector_parser :: spaced_parser _quoted_ :: spaced_parser _quasi_quoted_ ::
-spaced_parser _unquote_spliced_ :: spaced_parser _unquoted_ :: spaced_parser _scientific_notation_ :: spaced_parser  _squared_brackets_notation_ :: [])
+let _all_parsers = PC.disj_list ( make_wrapped_with_junk _boolean_parser_ ::  make_wrapped_with_junk char_parser ::
+ make_wrapped_with_junk _number_ ::  make_wrapped_with_junk string_parser ::  make_wrapped_with_junk symbol_parser :: make_wrapped_with_junk  _list_parser :: 
+ make_wrapped_with_junk _dotted_list_parser ::  make_wrapped_with_junk _vector_parser ::  make_wrapped_with_junk _quoted_ ::  make_wrapped_with_junk _quasi_quoted_ ::
+ make_wrapped_with_junk _unquote_spliced_ :: make_wrapped_with_junk _unquoted_ ::  make_wrapped_with_junk _scientific_notation_ ::  
+make_wrapped_with_junk  _squared_brackets_notation_ :: [])
 in _all_parsers s
 
 and char_parser s =
@@ -277,13 +293,13 @@ and _dotted_list_parser s =
     (PC.caten
        (PC.caten
 	  (PC.caten  (make_wrapped_with_junk _l_paren)  (PC.plus (make_wrapped_with_junk _sexpr_))) (PC.char '.')) (make_wrapped_with_junk _sexpr_)) (make_wrapped_with_junk _r_paren) in
-  let _packed_ = PC.pack parser (fun((((l,p),d),s),r)-> convert_to_nested_pair (p @ [s])) in
+  let _packed_ = PC.pack parser (fun((((l,p),d),s),r)-> (convert_to_nested_pair_dotted_list p s)) in (*convert_to_nested_pair (p @ [s])) in*)
   _packed_ s
 
 and _vector_parser s =
   let parser = PC.caten (PC.caten  (make_wrapped_with_junk vector_prefix)  (PC.star (make_wrapped_with_junk _sexpr_)))
                         (make_wrapped_with_junk _r_paren) in
-  let _packed_ = PC.pack parser (fun((l,s),r)->  Vector(s)) in
+  let _packed_ = PC.pack parser (fun((l,s),r)->  Vector(s )) in
   _packed_ s
     
 and  _quoted_ s = 
@@ -362,17 +378,24 @@ let x2 = Pair(Bool(true), Nil);;
 let e3 = read_sexpr "[#t 1 ]   ";;
 let x3 = Pair(Bool(true), Pair(Number(Int(1)), Nil));;
 
+(*let f e = match e with
+| Number(Float(e_float)) -> print_float(e_float)
+| _ ->print_float(0.0);;
 
-print_string (string_of_bool (sexpr_eq Nil e1) ^ "\n");;
-print_string (string_of_bool (sexpr_eq x2 e2) ^ "\n");;
-print_string (string_of_bool (sexpr_eq x3 e3) ^ "\n");;
+
+let x = Number(Float(-0.9375));;
+let e = read_sexpr  "#x-0.f";;
+print_string (string_of_bool (sexpr_eq e x));;
+f e;;
+*)
+
+let e = read_sexpr "#()";;
+let x = Vector ([]);;
+print_string (string_of_bool (sexpr_eq e x));;
 
 (*comments test*)
-(*
-let (e, s) =  _sexpr_comment_parser_ (string_to_list ";##f#t");;
-let x = Bool(true);;
-print_string (string_of_bool (sexpr_eq x e));;
-*)
+
+
 
 (*scientific notation tests*)
 (*

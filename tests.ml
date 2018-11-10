@@ -96,11 +96,11 @@ assertEquals (Pair(String("a"),Nil)) (Reader.read_sexpr "(\"a\")");;
 (*assertEquals (Pair(Char('0'),Pair(Char('?'), String("a string")))) (Reader.read_sexpr "(#\\x30#\\?\"a string\")");;*)   (*FAILS*)
 
 (* dotted list tests *)
-(*
+
 assertEquals (Pair(String("a"),String("a"))) (Reader.read_sexpr "(\"a\".\"a\")");;
 assertEquals (Pair(String("a"),Pair(String("b"), String("c")))) (Reader.read_sexpr "(\"a\"\"b\".\"c\")");;
 assertEquals (Pair(Char('0'),Pair(Char('?'), String("a string")))) (Reader.read_sexpr "(#\\x30#\\?.\"a string\")");;
-*)
+
 
 (*
 (* vector tests *)
@@ -131,7 +131,7 @@ assertTrue (sexpr_eq (Number(Int(-9523921))) (Reader.read_sexpr "-009523921")) "
 assertTrue (sexpr_eq (Number(Int(9523921))) (Reader.read_sexpr "+009523921")) "Should be 9523921";;
 
 (* Float tests *)
-(*
+
 assertTrue (sexpr_eq (Number(Float(12.0521))) (Reader.read_sexpr "12.0521")) "Should be 12.0521";;
 assertTrue (sexpr_eq (Number(Float(12.0521))) (Reader.read_sexpr "+12.0521")) "Should be 12.0521";;
 assertTrue (sexpr_eq (Number(Float(-12.0521))) (Reader.read_sexpr "-12.0521")) "Should be -12.0521";;
@@ -143,7 +143,7 @@ assertTrue (sexpr_eq (Number(Float(-0.5))) (Reader.read_sexpr "-0.5")) "Should b
 assertTrue (sexpr_eq (Number(Float(12.0521))) (Reader.read_sexpr "0012.0521")) "Should be 12.0521";;
 assertTrue (sexpr_eq (Number(Float(12.0521))) (Reader.read_sexpr "+00012.0521")) "Should be 12.0521";;
 assertTrue (sexpr_eq (Number(Float(-12.0521))) (Reader.read_sexpr "-00000012.0521")) "Should be -12.0521";;
-*)
+
 
 (* Simple HexInteger tests *)
 assertTrue (sexpr_eq (Number(Int(291))) (Reader.read_sexpr "#X123")) "Should be 291";;
@@ -171,7 +171,7 @@ assertTrue (sexpr_eq (Number(Int(-240))) (Reader.read_sexpr "#x-F0")) "Should be
 assertTrue (sexpr_eq (Number(Int(-240))) (Reader.read_sexpr "#x-f0")) "Should be -240";;
 
 (* Simple HexFloat tests *)
-(*
+
 assertTrue (sexpr_eq (Number(Float(0.99609375))) (Reader.read_sexpr "#x0.ff")) "Should be 0.99609375";;
 assertTrue (sexpr_eq (Number(Float(-0.99609375))) (Reader.read_sexpr "#x-0.ff")) "Should be -0.99609375";;
 assertTrue (sexpr_eq (Number(Float(0.99609375))) (Reader.read_sexpr "#X0.Ff")) "Should be 0.99609375";;
@@ -184,7 +184,7 @@ assertTrue (sexpr_eq (Number(Float(-0.9375))) (Reader.read_sexpr "#x-0.f")) "Sho
 assertTrue (sexpr_eq (Number(Float(-0.9375))) (Reader.read_sexpr "#x-0.f")) "Should be -0.9375";;
 assertTrue (sexpr_eq (Number(Float(-0.9375))) (Reader.read_sexpr "#x-0.F")) "Should be -0.9375";;
 assertTrue (sexpr_eq (Number(Float(-0.9375))) (Reader.read_sexpr "#X-0.F")) "Should be -0.9375";;
-*)
+
 
 (* Simple test for symbol *)
 assertTrue (sexpr_eq (Symbol("a$")) (Reader.read_sexpr "a$")) "Should be a$";;
@@ -228,6 +228,7 @@ assertEqualsLists ([Number(Int(1));Number(Int(2));Number(Int(-9))]) (Reader.read
 assertEqualsLists ([Number(Int(1));Number(Int(2));Number(Int(-9))]) (Reader.read_sexprs "1 2 -9");;
 assertEqualsLists ([Bool(true);Number(Int(1));Number(Int(2)); Bool(false);Number(Int(-9))]) (Reader.read_sexprs "#t 1 2 #f -9");;
 *)
+
 assertEquals (Pair(Bool(true),  Nil)) (Reader.read_sexpr "(        #T  )");;
 
 (*
@@ -274,3 +275,4 @@ assertEquals (Pair(Pair(Nil,Nil),Nil)) (Reader.read_sexpr "[[[]...");;
 assertEquals (Pair(Symbol("a"),Pair(Symbol("b"),Pair((Symbol("c")),Nil)))) (Reader.read_sexpr "[a[b[c...");;
 
 *)
+
