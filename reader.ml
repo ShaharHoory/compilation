@@ -123,16 +123,28 @@ let char_parser =
 (*END char parsering*)
 
 
-let un_visibleSimpleCharParser =
+let un_visibleSimpleCharParser =  PC.const (fun ch -> ch <= ' ') ;;
+
+(*let un_visibleSimpleCharParser =
   let simpleParser = PC.const (fun ch -> ch <= ' ') in
   PC.pack simpleParser (fun (ch) -> Char(ch));;
-  
+  *)
+
+
+let  _comment_parser  =
+  let newLineChar = PC.char_ci '\n' in
+  let oneLineChars = star (PC.diff PC.nt_any (PC.char_ci '\n')) in
+  let endOfComment = newLineChar in (* PC.nt_end_of_input in*)
+let parser = PC.caten (PC.caten (PC.char ';')  oneLineChars) endOfComment in
+		    PC.pack parser (fun ((s,o),e)->s);;
+		    
 
 (*identifies all the invisible chars - less than ' ' *)
-let _whitespace_and_co_parser = PC.star un_visibleSimpleCharParser ;;
+let _whitespace_and_co_parser = PC.disj un_visibleSimpleCharParser _comment_parser ;;
+
 
 let make_wrapped_with_junk p = 
-let parser = PC.caten (PC.caten _whitespace_and_co_parser p)  _whitespace_and_co_parser in
+let parser = PC.caten (PC.caten (PC.star _whitespace_and_co_parser) p)  (PC.star _whitespace_and_co_parser) in
 PC.pack parser (fun ((jl,p),jr) -> p);;
 
 let _natural_ = PC.plus _digit_;; 
@@ -193,13 +205,11 @@ let _r_paren = PC.char ')';;
 
 let rec convert_to_nested_pair sexpr_list = match sexpr_list with
 | [] -> Nil
-| head::body -> if head = Nil then (convert_to_nested_pair body)
-else Pair (head, (convert_to_nested_pair body));;
+| head::body ->  Pair (head, (convert_to_nested_pair body));;
 
 let rec convert_to_nested_pair_dotted_list sexpr_list sexpr_element = match sexpr_list with
 | [] -> sexpr_element
-|head::body -> if head = Nil then (convert_to_nested_pair_dotted_list body sexpr_element)
-else Pair(head,(convert_to_nested_pair_dotted_list body sexpr_element));;
+|head::body -> Pair(head,(convert_to_nested_pair_dotted_list body sexpr_element));;
 
 let vector_prefix = PC.word "#(";;
 
@@ -253,7 +263,7 @@ let _all_parsers = PC.disj_list ( make_wrapped_with_junk _boolean_parser_ ::  ma
  make_wrapped_with_junk _number_ ::  make_wrapped_with_junk string_parser ::  make_wrapped_with_junk symbol_parser :: make_wrapped_with_junk  _list_parser :: 
  make_wrapped_with_junk _dotted_list_parser ::  make_wrapped_with_junk _vector_parser ::  make_wrapped_with_junk _quoted_ ::  make_wrapped_with_junk _quasi_quoted_ ::
  make_wrapped_with_junk _unquote_spliced_ :: make_wrapped_with_junk _unquoted_ ::  make_wrapped_with_junk _scientific_notation_ ::  
-make_wrapped_with_junk  _squared_brackets_notation_  :: make_wrapped_with_junk  _comment_parser :: [])
+make_wrapped_with_junk  _squared_brackets_notation_  :: [])
 in _all_parsers s
 
 and char_parser s =
@@ -342,16 +352,10 @@ and _squared_brackets_notation_ s = (*FIX THE SPACE AFTER AN SEXPR PROBLEM (SEE 
   let twoParser = pack (caten (char '[') (caten wrappedSexpr (caten wrappedSexpr (char ']'))))
                                                 (fun ((lb, (sexpr1, (sexpr2, rb)))) -> convert_to_nested_pair [sexpr1; sexpr2]) in
   let _packed_ = disj_list [emptyParser; singleParser; twoParser] in
-  _packed_ s
+  _packed_ s;;
 
 (*COMMENTS PARSEERS*)
-and  _comment_parser s =
-  let newLineChar = PC.char_ci '\n' in
-  let oneLineChars = star (PC.diff PC.nt_any (PC.char_ci '\n')) in
-  let endOfComment = newLineChar in (* PC.nt_end_of_input in*)
-  let parser = PC.caten (PC.caten (PC.char ';')  oneLineChars) endOfComment in
-  let _packed_ = PC.pack parser (fun ((s,o),e)-> Nil) in
-   _packed_  s;;
+
  
 				  
 (*
@@ -393,7 +397,6 @@ print_string (string_of_bool (sexpr_eq e x));;
 f e;;
 *)
 
-let e = read_sexpr "(#\\c 37392.39382 37392 \"this\" .  ;324324DSFDSFSD\n  )";;
 
 
 

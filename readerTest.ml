@@ -504,7 +504,7 @@ let test_QuasiQuoted_ = fun () ->
 
 let test_LineComment_ = fun () ->
     current_test := "test_LineComment_";
-    (*test 1 (sexpr_eq (execute_read_sexpr "; sdfdkerjdfk 4594359ksmdvc fdskfs\n#t") (execute_expected(Bool true)));
+    test 1 (sexpr_eq (execute_read_sexpr "; sdfdkerjdfk 4594359ksmdvc fdskfs\n#t") (execute_expected(Bool true)));
     test 2 (sexpr_eq (execute_read_sexpr "#f;sadasujnxjzcnjsaudj ij49fdsf") (execute_expected(Bool false)));
     test 3 (sexpr_eq (execute_read_sexpr " #f") (execute_expected(Bool false)));
     test 4 (sexpr_eq (execute_read_sexpr ";asdi39isksdkmkdsfkdskf\n #t") (execute_expected(Bool true)));
@@ -567,7 +567,7 @@ let test_LineComment_ = fun () ->
     test 61 (sexpr_eq (execute_read_sexpr "   (#t . #xA.A) ;fdsdsfdsf\n\n\n ") (execute_expected(Pair(Bool(true),Number(Float(10.625))))));
     test 62 (sexpr_eq (execute_read_sexpr "( #\\c ;sfdsfdsf\n\n . 37392.39382 )") (execute_expected(Pair(Char('c'), Number(Float(37392.39382))))));
     test 63 (sexpr_eq (execute_read_sexpr "( #\\c 37392.39382 . 37392 )") (execute_expected(Pair(Char('c'), Pair(Number(Float(37392.39382)), Number(Int(37392)))))));
-    test 64 (sexpr_eq (execute_read_sexpr "( #\\c 37392.39382 37392 ;fsdfds#$#$#%$#\n . \"this\" )") (execute_expected(Pair(Char('c'), Pair(Number(Float(37392.39382)), Pair(Number(Int(37392)), String("this")))))));*)
+    test 64 (sexpr_eq (execute_read_sexpr "( #\\c 37392.39382 37392 ;fsdfds#$#$#%$#\n . \"this\" )") (execute_expected(Pair(Char('c'), Pair(Number(Float(37392.39382)), Pair(Number(Int(37392)), String("this")))))));
     test 65 (sexpr_eq (execute_read_sexpr "(#\\c 37392.39382 37392 \"this\" . ;324324DSFDSFSD\n #t)") (execute_expected(Pair(Char('c'), Pair(Number(Float(37392.39382)), Pair(Number(Int(37392)), Pair(String("this"), Bool(true))))))));
     ;;
   
