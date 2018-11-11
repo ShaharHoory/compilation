@@ -253,18 +253,49 @@ let spaced_parser p =
 let parser =  PC.not_followed_by p  (PC.diff (PC.diff PC.nt_any PC.nt_whitespace) _r_paren)  in
  make_wrapped_with_junk parser;;
 
-
+let nt_r_paren_ = disj (PC.char ']') (PC.char ')');;
+let nt_l_paren_ = disj (PC.char '(') (PC.char '[');;
 
 (**********************************************************************************************************************************************************************)
 
 
 let rec _sexpr_ s = 
-let _all_parsers = PC.disj_list ( make_wrapped_with_junk _boolean_parser_ ::  make_wrapped_with_junk char_parser ::
- make_wrapped_with_junk _number_ ::  make_wrapped_with_junk string_parser ::  make_wrapped_with_junk symbol_parser :: make_wrapped_with_junk  _list_parser :: 
- make_wrapped_with_junk _dotted_list_parser ::  make_wrapped_with_junk _vector_parser ::  make_wrapped_with_junk _quoted_ ::  make_wrapped_with_junk _quasi_quoted_ ::
+let _all_parsers = PC.disj_list ( _three_dots_ ::  make_wrapped_with_junk _boolean_parser_ ::  make_wrapped_with_junk char_parser ::
+ make_wrapped_with_junk _number_ ::  make_wrapped_with_junk string_parser ::  make_wrapped_with_junk symbol_parser ::  make_wrapped_with_junk _dotted_list_parser ::
+ make_wrapped_with_junk  _list_parser :: make_wrapped_with_junk _vector_parser ::  make_wrapped_with_junk _quoted_ ::  make_wrapped_with_junk _quasi_quoted_ ::
  make_wrapped_with_junk _unquote_spliced_ :: make_wrapped_with_junk _unquoted_ ::  make_wrapped_with_junk _scientific_notation_ ::  
-make_wrapped_with_junk  _squared_brackets_notation_  :: [])
+make_wrapped_with_junk  _squared_brackets_notation_  ::  [])
 in _all_parsers s
+
+
+and _all_ s = 
+let parser = PC.disj_list ((PC.diff _sexpr_ _three_dots_) :: _dotted_list_maybe_ :: _list_maybe_ :: _vector_maybe_ :: []) in
+parser s
+
+and _three_dots_ s = 
+let parser = PC.caten (PC.disj_list (_dotted_list_maybe_:: _list_maybe_ :: _vector_maybe_ :: [])) (PC.word "...") in
+let _packed_ = PC.pack parser (fun (l,e)->l) in
+_packed_  s
+
+
+and _dotted_list_maybe_ s = 
+let parser = PC.caten ( PC.caten (PC.caten (PC.caten nt_l_paren_  (plus _all_)) (PC.char '.'))  _all_ ) (maybe nt_r_paren_) in
+let _packed_ = PC.pack parser (fun((((lp,plus_a),d),a),rp)->  (convert_to_nested_pair_dotted_list plus_a a)) in
+_packed_  s
+
+
+
+and _list_maybe_ s = 
+let parser = PC.caten (PC.caten nt_l_paren_ (star _all_)) (maybe nt_r_paren_) in
+let _packed_ = PC.pack parser (fun((lp,a),rp)-> convert_to_nested_pair a) in
+_packed_  s
+
+
+
+and _vector_maybe_ s = 
+let parser = PC.caten (PC.caten (PC.caten (PC.char '#')  nt_l_paren_ ) (star _all_) )  (maybe nt_r_paren_)  in
+let _packed_ = PC.pack parser (fun (((prefix, lp),star_a),rp)->Vector(star_a)) in
+_packed_ s
 
 and char_parser s =
   let parser = PC.caten char_prefix (PC.disj_list [hexCharParser; namedCharParser; visibleSimpleCharParser]) in   
@@ -396,6 +427,8 @@ let e = read_sexpr  "#x-10.99";;
 print_string (string_of_bool (sexpr_eq e x));;
 f e;;
 *)
+
+
 
 
 
