@@ -606,7 +606,7 @@ let test_ReadSexpr_ = fun () ->
     test 2 (sexpr_eq (execute_read_sexpr "#t") (execute_expected(Bool(true))));
     test 3 (sexpr_eq (execute_read_sexpr ";asasdasfasf\n #t ;ffdsfdsfdsf") (execute_expected(Bool(true))));
     test 4 (sexpr_eq (execute_read_sexpr ";asasdasfasf\n #t ;ffdsfdsfdsf\n #f") (execute_expected(String("test failed"))));
-    test 5 (sexpr_eq (execute_read_sexpr ";asasdasfasf\n #t ;ffdsfdsfdsf\n #; #f") (execute_expected(Bool(true))));
+    test 5 (sexpr_eq (execute_read_sexpr ";asasdasfasf\n #t ;ffdsfdsfdsf\n ; #f") (execute_expected(Bool(true))));
     ;;
 
 let test_ReadSexprs_ = fun () ->
@@ -635,9 +635,9 @@ let test_ReadSexprs_ = fun () ->
 
 let test_SceintificNotation_ = fun () ->
     current_test := "test_SceintificNotation_";
-    test 1 (sexpr_eq (execute_read_sexpr "1e1") (execute_expected(Number (Float 10.0))));
-    test 2 (sexpr_eq (execute_read_sexpr "10.0E2") (execute_expected(Number (Float 1000.0))));
-    test 3 (sexpr_eq (execute_read_sexpr "1E+1") (execute_expected(Number (Float 10.0))));
+    test 1 (sexpr_eq (execute_read_sexpr "1e1") (execute_expected(Number (Float (10.0)))));
+    test 2 (sexpr_eq (execute_read_sexpr "10.0E2") (execute_expected(Number (Float (1000.0)))));
+    test 3 (sexpr_eq (execute_read_sexpr "1E+1") (execute_expected(Number (Float (10.0)))));
     test 4 (sexpr_eq (execute_read_sexpr "10e-1") (execute_expected(Number (Float((1.0))))));
     test 5 (sexpr_eq (execute_read_sexpr "3.14e+9") (execute_expected(Number (Float (3140000000.0)))));
     test 6 (sexpr_eq (execute_read_sexpr "+000000012.3E00000002") (execute_expected(Number (Float (1230.0)))));
@@ -668,10 +668,7 @@ let test_ThreeDots_ = fun () ->
     test 13 (sexpr_eq_as_list (execute_read_sexprs_as_list " ...  (\"...\") ...  [([#\\c . ;...\n #\\d ... [1] ...") (execute_expected_as_list([Pair(String("..."),Nil); Pair(Pair(Pair(Char('c'),Char('d')),Nil),Nil); Pair(Number(Int(1)),Nil)])));
     ;;
 
-let tests = test_Boolean_ :: test_Char_ :: test_Number_ :: test_String_ :: test_Symbol_ :: test_List_ :: test_DottedList_ :: test_Vector_ :: test_Quoted_ :: test_QuasiQuoted_ :: test_Unquoted_:: test_UnquotedSpliced_ :: test_LineComment_ :: test_ThreeDots_ ::[];;
-(* :: test_Char_ :: test_Number_ :: test_String_ :: test_Symbol_ :: test_List_ :: test_DottedList_ :: test_Vector_ :: test_Quoted_ :: test_QuasiQuoted_ :: test_Unquoted_:: test_UnquotedSpliced_ ::
-   test_LineComment_ :: test_SexprComment_ :: test_ReadSexpr_ :: test_ReadSexprs_ :: test_SceintificNotation_ :: test_ThreeDots_ :: [];;
-   *)
+let tests =(test_Boolean_:: test_Char_ :: test_Number_ :: test_String_ :: test_Symbol_ :: test_List_ :: test_DottedList_ :: test_Vector_ :: test_Quoted_ :: test_QuasiQuoted_ :: test_Unquoted_:: test_UnquotedSpliced_ :: test_LineComment_ :: (*test_SexprComment_ ::*) test_ReadSexpr_ :: test_ReadSexprs_ :: test_SceintificNotation_ :: (*test_ThreeDots_ ::*) []);;
 
 
 let rec start_tests = function 

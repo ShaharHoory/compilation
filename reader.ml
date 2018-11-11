@@ -125,16 +125,13 @@ let char_parser =
 
 let un_visibleSimpleCharParser =  PC.const (fun ch -> ch <= ' ') ;;
 
-(*let un_visibleSimpleCharParser =
-  let simpleParser = PC.const (fun ch -> ch <= ' ') in
-  PC.pack simpleParser (fun (ch) -> Char(ch));;
-  *)
-
+let packedEndOfInput =
+  pack (nt_end_of_input) (fun (el1) -> ('\000'));;
 
 let  _comment_parser  =
   let newLineChar = PC.char_ci '\n' in
   let oneLineChars = star (PC.diff PC.nt_any (PC.char_ci '\n')) in
-  let endOfComment = newLineChar in (* PC.nt_end_of_input in*)
+  let endOfComment = disj newLineChar packedEndOfInput in
 let parser = PC.caten (PC.caten (PC.char ';')  oneLineChars) endOfComment in
 		    PC.pack parser (fun ((s,o),e)->s);;
 		    
@@ -144,8 +141,8 @@ let _whitespace_and_co_parser = PC.disj un_visibleSimpleCharParser _comment_pars
 
 
 let make_wrapped_with_junk p = 
-let parser = PC.caten (PC.caten (PC.star _whitespace_and_co_parser) p)  (PC.star _whitespace_and_co_parser) in
-PC.pack parser (fun ((jl,p),jr) -> p);;
+  let parser = PC.caten (PC.caten (PC.star _whitespace_and_co_parser) p)  (PC.star _whitespace_and_co_parser) in
+  PC.pack parser (fun ((jl,p),jr) -> p);;
 
 let _natural_ = PC.plus _digit_;; 
 let _plus_or_minus_ = PC.disj (PC.char '+') (PC.char '-') ;;
@@ -153,12 +150,12 @@ let _plus_or_minus_ = PC.disj (PC.char '+') (PC.char '-') ;;
 (*integer works!*)
 let _integer_ = 
   let parser = PC.caten (PC.maybe _plus_or_minus_) _natural_ in 
-      PC.pack parser (fun (s,n)->
-	match s with
-	| Some c -> if c = '-' 
-	  then Number(Int(-1*(int_of_string (list_to_string n))))
-	  else Number(Int(int_of_string (list_to_string n)))
-	|None -> Number(Int(int_of_string (list_to_string n))));;
+  PC.pack parser (fun (s,n)->
+    match s with
+    | Some c -> if c = '-' 
+      then Number(Int(-1*(int_of_string (list_to_string n))))
+      else Number(Int(int_of_string (list_to_string n)))
+    |None -> Number(Int(int_of_string (list_to_string n))));;
 
 (*this is working, can be written cleaner.. & need to change execption instead last case*)
 let _float_zero_ =
@@ -215,7 +212,7 @@ let vector_prefix = PC.word "#(";;
 
 
 (*string parser START*)
-let stringLiteralChar = const (fun c -> c <> '\\' && c <> '\"');; (*Check BOTH !!!!!!!!!!!!!!!!!!!!!*)
+let stringLiteralChar = const (fun c -> c <> '\\' && c <> '\"');;
 
 (* we return chars(really chars) and not Char (sexp chars) so that we can cuild the whole string from whose chars *)
 let stringHexChar = 
@@ -365,9 +362,8 @@ and _unquote_spliced_ s =
   let _packed_ = PC.pack parser (fun (c,e)-> Pair(Symbol("unquote-splicing"), Pair(e, Nil))) in
   _packed_ s
 
-(*TO NAAMA - this returns always float because scientific notation in Scheme always return floats - TO NAAMA*)
 and _scientific_notation_ s =
-  let intOrFloat = disj _integer_ _float_ in
+  let intOrFloat = disj _float_ _integer_ in
   let eOrE = char_ci 'e' in
   let parser = caten (caten intOrFloat eOrE) _integer_ in
   let _packed_ = pack parser (fun (((base, e), exponent)) -> match base, exponent with
@@ -380,9 +376,9 @@ and _squared_brackets_notation_ s = (*FIX THE SPACE AFTER AN SEXPR PROBLEM (SEE 
   let wrappedSexpr = make_wrapped_with_junk _sexpr_ in
   let emptyParser = pack (caten (char '[') (caten (star nt_whitespace) (char ']'))) (fun ((lb,(ws,rb))) -> convert_to_nested_pair []) in
   let singleParser = pack (caten (char '[') (caten wrappedSexpr (char ']'))) (fun ((lb, (sexpr, rb))) -> convert_to_nested_pair [sexpr]) in
-  let twoParser = pack (caten (char '[') (caten wrappedSexpr (caten wrappedSexpr (char ']'))))
+  let coupleParser = pack (caten (char '[') (caten wrappedSexpr (caten wrappedSexpr (char ']'))))
                                                 (fun ((lb, (sexpr1, (sexpr2, rb)))) -> convert_to_nested_pair [sexpr1; sexpr2]) in
-  let _packed_ = disj_list [emptyParser; singleParser; twoParser] in
+  let _packed_ = disj_list [emptyParser; singleParser; coupleParser] in
   _packed_ s;;
 
 (*COMMENTS PARSEERS*)
@@ -397,10 +393,12 @@ let _sexpr_comment_parser_ =
 *)
 
 let read_sexpr string =
-  let (sexpr, charlist) = _sexpr_ (string_to_list string) in
+  let (sexpr, charlist) = (not_followed_by _sexpr_ nt_any) (string_to_list string) in
   sexpr;;
 
-let read_sexprs string = raise X_not_yet_implemented;;
+let read_sexprs string =
+  let (sexprList, charlist) = (star _sexpr_) (string_to_list string) in
+  sexprList;;
  (* let (e, s) = (disj_list [_boolean_parser_; char_parser; _number_; symbol_parser; string_parser]) (string_to_list string) in
   match (List.length s) with
   | 0 -> e
@@ -411,7 +409,7 @@ let read_sexprs string = raise X_not_yet_implemented;;
 
 (*--------tests--------*)
 (*SQUARE BRACKETS NOTATION TESTS*)
-
+(*
 let e1 = read_sexpr "[]";;
 let e2 = read_sexpr "[#t ]";; (*[#t] without the space doesnt work but it should!!! - FIX*)
 let x2 = Pair(Bool(true), Nil);;
@@ -421,6 +419,7 @@ let x3 = Pair(Bool(true), Pair(Number(Int(1)), Nil));;
 let f e = match e with
 | Number(Float(e_float)) -> print_float(e_float)
 | _ ->print_float(0.0);;
+*)
 (*
 let x = Number(Float(-1.0 *. (float_of_string "0x10.99")));;
 let e = read_sexpr  "#x-10.99";;
@@ -435,8 +434,8 @@ f e;;
 
 (*scientific notation tests*)
 (*
-let (e, s) = _scientific_notation_ (string_to_list "100e-1");;
-let x = Number(Float(10.0));;
+let (e, s) = _scientific_notation_ (string_to_list "10.0E2");;
+let x = Number(Float(1000.0));;
 print_string (string_of_bool (sexpr_eq x e));;
 *)
 
