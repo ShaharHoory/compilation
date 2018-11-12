@@ -1,3 +1,4 @@
+
 (* reader.ml
  * A compiler from Scheme to x86/64
  *
@@ -5,8 +6,6 @@
  *)
 
 #use "pc.ml";;
-
-open PC
 
 exception X_not_yet_implemented;;
 exception X_this_should_not_happen;;
@@ -29,7 +28,8 @@ let rec sexpr_eq s1 s2 =
   match s1, s2 with
   | Bool(b1), Bool(b2) -> b1 = b2
   | Nil, Nil -> true
-  | Number(n1), Number(n2) -> n1 = n2
+  | Number(Float f1), Number(Float f2) -> abs_float(f1 -. f2) < 0.001
+  | Number(Int n1), Number(Int n2) -> n1 = n2
   | Char(c1), Char(c2) -> c1 = c2
   | String(s1), String(s2) -> s1 = s2
   | Symbol(s1), Symbol(s2) -> s1 = s2
@@ -45,7 +45,7 @@ end
 let normalize_scheme_symbol str =
   let s = string_to_list str in
   if (andmap
-	(fun ch -> (ch = (Char.lowercase ch)))
+	(fun ch -> (ch = (lowercase_ascii ch)))
 	s) then str
   else Printf.sprintf "|%s|" str;;
 
@@ -440,6 +440,9 @@ and _scientific_notation_ s =
   _packed_ s
 
 
+
+
+
 let read_sexpr string =
   let (sexpr, charlist) = (not_followed_by _sexpr_ nt_any) (string_to_list string) in
   sexpr;;
@@ -448,96 +451,6 @@ let read_sexprs string =
   let (sexprList, charlist) = (star _sexpr_) (string_to_list string) in
   sexprList;;
 
+end;;
+
 (**********************************************************************************************************************************************************************)
-
-(*--------tests--------*)
-(*SQUARE BRACKETS NOTATION TESTS*)
-(*
-let e1 = read_sexpr "[]";;
-let e2 = read_sexpr "[#t ]";; (*[#t] without the space doesnt work but it should!!! - FIX*)
-let x2 = Pair(Bool(true), Nil);;
-let e3 = read_sexpr "[#t 1 ]   ";;
-let x3 = Pair(Bool(true), Pair(Number(Int(1)), Nil));;
-*)
-let f e = match e with
-| Number(Float(e_float)) -> print_float(e_float)
-| _ ->print_float(0.0);;
-
-
-let x = Number(Int(2));;
-let e = read_sexpr  "#; #x-10.99 2";;
-print_string (string_of_bool (sexpr_eq e x));;
-f e;;
-
-
-
-
-
-
-
-(*scientific notation tests*)
-(*
-let (e, s) = _scientific_notation_ (string_to_list "10.0E2");;
-let x = Number(Float(1000.0));;
-print_string (string_of_bool (sexpr_eq x e));;
-*)
-
-(*Boolean tests*)
-(*
-let (e, s) = _sexpr_ (string_to_list " #t");;
-let x = Bool(true);;
-print_string (string_of_bool (sexpr_eq x e));;
-*)
-
-
-(*regular string test*)
-(*
-let str2 = "\"hello\"";;
-print_string str2;;
-trace_pc "strings parser" string_parser (string_to_list "\"hello\"");;
-(*let (e, s) = string_parser (string_to_list str);; 
-*)
-
-(*
-
-let x = String("hello");;
-  print_string (string_of_bool (sexpr_eq x e));;*)
-
-(*hex string test*)
-let (e, s) = string_parser (string_to_list "\x30");; 
-let x = String("0");;
-print_string (string_of_bool (sexpr_eq x e));;
-
-(*hex string test - DOESN'T WORK!!!*)
-let (e, s) = string_parser (string_to_list "\n");; 
-let x = String(Char.escaped (Char.chr(10)));;
-print_string (string_of_bool (sexpr_eq x e));;
-
-*)
-
-(*Symbol tests*)
-(*
-let (e,s) = symbol_parser (string_to_list "?C");;
- let x =  Symbol("?c ");;
-print_string (string_of_bool (sexpr_eq x e));;(* COMMENT OUT FOR TESTING *)
-*)
-
-(*---char tests---*)
-(*
-let (e,s) = char_parser (string_to_list "#\\xa");;
-  let x =  Char('\n');;
-print_string (string_of_bool (sexpr_eq x e));;(* COMMENT OUT FOR TESTING *)
-
-(**print_string (list_to_string e);;**)
-
-(*let x = namedCharParser "newline";;*)
-
-(*print_string (e);;*)
-(*let b = Bool(false);;
-let x = Number(Int(5));;
-print_string (string_of_bool (sexpr_eq b e));
-*)
-
-*)
-
-end;; (* struct Reader *) (*MOVE ME TO BEFORE TESTS*)
