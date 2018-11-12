@@ -258,10 +258,10 @@ let nt_l_paren_ = disj (PC.char '(') (PC.char '[');;
 
 let rec _sexpr_ s = 
 let _all_parsers = PC.disj_list ( _three_dots_ ::   make_wrapped_with_junk _scientific_notation_ :: make_wrapped_with_junk _boolean_parser_ ::  make_wrapped_with_junk char_parser ::
- make_wrapped_with_junk _number_ ::  make_wrapped_with_junk string_parser ::  make_wrapped_with_junk symbol_parser ::  make_wrapped_with_junk _dotted_list_parser ::
- make_wrapped_with_junk  _list_parser :: make_wrapped_with_junk _vector_parser ::  make_wrapped_with_junk _quoted_ ::  make_wrapped_with_junk _quasi_quoted_ ::
+				    make_wrapped_with_junk _number_ ::  make_wrapped_with_junk string_parser ::  make_wrapped_with_junk symbol_parser ::  make_wrapped_with_junk _dotted_list_parser (*:: make_wrapped_with_junk _squared_dotted_list_parser*)::
+				    make_wrapped_with_junk  _list_parser (*:: make_wrapped_with_junk  _squared_list_parser*) :: make_wrapped_with_junk _vector_parser ::  make_wrapped_with_junk _quoted_ ::  make_wrapped_with_junk _quasi_quoted_ ::
  make_wrapped_with_junk _unquote_spliced_ :: make_wrapped_with_junk _unquoted_  ::  
-make_wrapped_with_junk  _squared_brackets_notation_  ::  [])
+ make_wrapped_with_junk  _squared_brackets_notation_  ::  [])
 in _all_parsers s
 
 
@@ -328,11 +328,25 @@ and _list_parser s =
   let _packed_ = PC.pack parser (fun((l,s),r)-> convert_to_nested_pair s) in
   _packed_ s
 
+and _squared_list_parser s =
+  let parser = PC.caten (PC.caten  (make_wrapped_with_junk (char '['))  (PC.star (make_wrapped_with_junk _sexpr_)))
+                        (make_wrapped_with_junk (char ']')) in
+  let _packed_ = PC.pack parser (fun((l,s),r)-> convert_to_nested_pair s) in
+  _packed_ s
+
 and _dotted_list_parser s =
   let parser = PC.caten
     (PC.caten
        (PC.caten
 	  (PC.caten  (make_wrapped_with_junk _l_paren)  (PC.plus (make_wrapped_with_junk _sexpr_))) (PC.char '.')) (make_wrapped_with_junk _sexpr_)) (make_wrapped_with_junk _r_paren) in
+  let _packed_ = PC.pack parser (fun((((l,p),d),s),r)-> (convert_to_nested_pair_dotted_list p s)) in (*convert_to_nested_pair (p @ [s])) in*)
+  _packed_ s
+
+and _squared_dotted_list_parser s =
+  let parser = PC.caten
+    (PC.caten
+       (PC.caten
+	  (PC.caten  (make_wrapped_with_junk (char '['))  (PC.plus (make_wrapped_with_junk _sexpr_))) (PC.char '.')) (make_wrapped_with_junk _sexpr_)) (make_wrapped_with_junk (char ']')) in
   let _packed_ = PC.pack parser (fun((((l,p),d),s),r)-> (convert_to_nested_pair_dotted_list p s)) in (*convert_to_nested_pair (p @ [s])) in*)
   _packed_ s
 
@@ -371,6 +385,7 @@ and _scientific_notation_ s =
     | Number(Int(b)), Number(Int(e)) -> Number(Float(float_of_int(b) *. (10.0 ** float_of_int(e))))
     | _ -> raise X_no_match) in
   _packed_ s
+
 
 and _squared_brackets_notation_ s = (*FIX THE SPACE AFTER AN SEXPR PROBLEM (SEE IN TESTS) *)
   let wrappedSexpr = make_wrapped_with_junk _sexpr_ in
