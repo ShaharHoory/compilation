@@ -221,9 +221,9 @@ let test_DottedList_ = fun () ->
     test 5 (sexpr_eq (execute_read_sexpr "( #\\c . 37392.39382 )") (execute_expected(Pair(Char('c'), Number(Float(37392.39382))))));
     test 6 (sexpr_eq (execute_read_sexpr "( #\\c 37392.39382 . 37392 )") (execute_expected(Pair(Char('c'), Pair(Number(Float(37392.39382)), Number(Int(37392)))))));
     test 7 (sexpr_eq (execute_read_sexpr "( #\\c 37392.39382 37392 . \"this\" )") (execute_expected(Pair(Char('c'), Pair(Number(Float(37392.39382)), Pair(Number(Int(37392)), String("this")))))));
-    (*test 8 (sexpr_eq (execute_read_sexpr "[#\\c (37392.39382) 37392 \"this\" . #t]") (execute_expected(Pair(Char('c'), Pair(Pair(Number(Float(37392.39382)),Nil), Pair(Number(Int(37392)), Pair(String("this"), Bool(true))))))));
+    test 8 (sexpr_eq (execute_read_sexpr "[#\\c (37392.39382) 37392 \"this\" . #t]") (execute_expected(Pair(Char('c'), Pair(Pair(Number(Float(37392.39382)),Nil), Pair(Number(Int(37392)), Pair(String("this"), Bool(true))))))));
     test 9 (sexpr_eq (execute_read_sexpr "( #\\c [37392.39382 . 37392] . \"this\" )") (execute_expected(Pair(Char('c'), Pair(Pair(Number(Float(37392.39382)), Number(Int(37392))), String("this"))))));
-*)
+
     ;;
 
 let test_Vector_ = fun () ->
@@ -660,7 +660,7 @@ let test_ThreeDots_ = fun () ->
     test 5 (sexpr_eq (execute_read_sexpr "(#t \"...\" . #F)") (execute_expected(Pair(Bool(true),Pair(String("..."),Bool(false))))));
     test 6 (sexpr_eq (execute_read_sexpr "(#t \"...\" . #F) ...") (execute_expected(Pair(Bool(true),Pair(String("..."),Bool(false))))));
     test 7 (sexpr_eq (execute_read_sexpr "(#t \"...\" . #F) ...") (execute_expected(Pair(Bool(true),Pair(String("..."),Bool(false))))));
-    test 8 (sexpr_eq_as_list (execute_read_sexprs_as_list "  ... (\"...\") ... [1]") (execute_expected_as_list([Pair(String("..."),Nil); Pair(Number(Int(1)),Nil)])));
+    test 8 (sexpr_eq_as_list (execute_read_sexprs_as_list " ... (\"...\") ... [1]") (execute_expected_as_list([Pair(String("..."),Nil); Pair(Number(Int(1)),Nil)])));
     test 9 (sexpr_eq_as_list (execute_read_sexprs_as_list "  ... (\"...\") ... [1] ...") (execute_expected_as_list([Pair(String("..."),Nil); Pair(Number(Int(1)),Nil)])));
     test 10 (sexpr_eq_as_list (execute_read_sexprs_as_list " ...  (\"...\") ... () ... [1] ...") (execute_expected_as_list([Pair(String("..."),Nil); Nil; Pair(Number(Int(1)),Nil)])));
     test 11 (sexpr_eq_as_list (execute_read_sexprs_as_list " ...  (\"...\") ... (;...\n) ... [1] ...") (execute_expected_as_list([Pair(String("..."),Nil); Nil; Pair(Number(Int(1)),Nil)])));
@@ -668,7 +668,7 @@ let test_ThreeDots_ = fun () ->
     test 13 (sexpr_eq_as_list (execute_read_sexprs_as_list " ...  (\"...\") ...  [([#\\c . ;...\n #\\d ... [1] ...") (execute_expected_as_list([Pair(String("..."),Nil); Pair(Pair(Pair(Char('c'),Char('d')),Nil),Nil); Pair(Number(Int(1)),Nil)])));
     ;;
 
-let tests =(test_Boolean_:: test_Char_ :: test_Number_ :: test_String_ :: test_Symbol_ :: test_List_ :: test_DottedList_ :: test_Vector_ :: test_Quoted_ :: test_QuasiQuoted_ :: test_Unquoted_:: test_UnquotedSpliced_ :: test_LineComment_ :: (*test_SexprComment_ ::*) test_ReadSexpr_ :: test_ReadSexprs_ :: test_SceintificNotation_ :: test_ThreeDots_ :: []);;
+let tests =(test_Boolean_:: test_Char_ :: test_Number_ :: test_String_ :: test_Symbol_ :: test_List_ :: test_DottedList_ :: test_Vector_ :: test_Quoted_ :: test_QuasiQuoted_ :: test_Unquoted_:: test_UnquotedSpliced_ :: test_LineComment_ :: test_SexprComment_ :: test_ReadSexpr_ :: test_ReadSexprs_ :: test_SceintificNotation_ :: test_ThreeDots_ :: []);;
 
 
 let rec start_tests = function 
