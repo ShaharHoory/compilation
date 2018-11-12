@@ -448,8 +448,11 @@ let read_sexpr string =
   sexpr;;
 
 let read_sexprs string =
-  let (sexprList, charlist) = (star _sexpr_) (string_to_list string) in
-  sexprList;;
+  if string = ""
+  then []
+  else
+    let (sexprList, charlist) = (star _sexpr_) (string_to_list string) in
+    sexprList;;
 
 
 end;;
