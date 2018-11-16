@@ -88,6 +88,7 @@ let rec tag_parse sexpr =
 	|Symbol(e)->if (is_not_reserved_word e) then Var(e) else raise X_syntax_error
 	(*if expr*)
 	|Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Pair(e_else, Nil)))) -> If((tag_parse e_cond), (tag_parse e_then), (tag_parse e_else))
+	|Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Nil))) -> If((tag_parse e_cond), (tag_parse e_then), Const(Void))
 	| _ -> raise X_syntax_error;;
 
 (*tests*)
@@ -136,7 +137,8 @@ test_function (Pair(Symbol("quote"), Pair(Bool(true), Nil))) (Const(Sexpr(Bool(t
 (*test variable*)
 test_function (Symbol("hello")) (Var("hello"));;
 (*tag_parse (Symbol("cond"));;*) (*expect for syntax error*)
-let sexpr_if = Pair(Symbol("if"), Pair(Bool(true), Pair(String("a"), Pair(String("b"), Nil))));;
-let expr_if = If (Const(Sexpr(Bool(true))), Const(Sexpr(String("a"))), Const(Sexpr(String("b"))));;
-test_function sexpr_if expr_if;;
+test_function (Pair(Symbol("if"), Pair(Bool(true), Pair(String("a"), Pair(String("b"), Nil))))) 
+				(If (Const(Sexpr(Bool(true))), Const(Sexpr(String("a"))), Const(Sexpr(String("b")))));;
+test_function (Pair(Symbol("if"), Pair(Bool(true), Pair(String("a"), Nil)))) 
+				(If (Const(Sexpr(Bool(true))), Const(Sexpr(String("a"))), Const(Void)));;
 end;; (* struct Tag_Parser *)
