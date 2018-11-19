@@ -75,21 +75,49 @@ let tag_parse_expression sexpr = raise X_not_yet_implemented;;
 
 let tag_parse_expressions sexpr = raise X_not_yet_implemented;;
 
+let rec isProperList arglist = 
+	match arglist with
+	|Pair (exp1, Nil)-> true
+	|Pair (exp1, Pair(exp_1, exp_2)) -> isProperList (Pair(exp_1, exp_2))
+	|_-> false ;;
+
+let sexprToString symbolSexpr = 
+	match symbolSexpr with
+	|Symbol (s) -> s
+	|_-> raise X_syntax_error;;
+
+(*let rec makeStringList arglist = 
+	match arglist with
+	|Pair (exp1, exp2) -> (sexprToString exp1) :: (makeStringList exp2):: []
+	|Nil -> []
+	|_-> (sexprToString _);;
+*)
+
+
 let rec tag_parse sexpr = 
 	match sexpr with
 	(*constants*)
 	| Bool(e) -> Const(Sexpr(Bool(e)))
 	| Number(Int(e_int))->Const(Sexpr(Number(Int(e_int))))
 	| Number(Float(e_float))->Const(Sexpr(Number(Float(e_float))))
-	|Char(e_char)->Const(Sexpr(Char(e_char)))
-	|String(e_string)->Const(Sexpr(String(e_string)))
-	|Pair(Symbol("quote"), Pair(e_sexpr, Nil))->Const(Sexpr(e_sexpr))
+	| Char(e_char)->Const(Sexpr(Char(e_char)))
+	| String(e_string)->Const(Sexpr(String(e_string)))
+	| Pair(Symbol("quote"), e_sexpr)-> (tag_parse e_sexpr)
 	(*variables*)
-	|Symbol(e)->if (is_not_reserved_word e) then Var(e) else raise X_syntax_error
+	| Symbol(e)->if (is_not_reserved_word e) then Var(e) else raise X_syntax_error
 	(*if expr*)
-	|Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Pair(e_else, Nil)))) -> If((tag_parse e_cond), (tag_parse e_then), (tag_parse e_else))
-	|Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Nil))) -> If((tag_parse e_cond), (tag_parse e_then), Const(Void))
+	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Pair(e_else, Nil)))) -> If((tag_parse e_cond), (tag_parse e_then), (tag_parse e_else))
+	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Nil))) -> If((tag_parse e_cond), (tag_parse e_then), Const(Void))
+	(*lambdas*)
+	(*|Pair(Symbol("lambda"), Pair (arglist, exprs)) -> *)
+	(*or *)
+	(*| Pair (Symbol("or"), Pair (exp1, exp2)) -> Or ((tag_parse exp1) :: (tag_parse exp2) :: [])*)
+	(*|Pair(proc,argsSeq) -> Applic ((tag_parse proc), (tag_parse argsSeq))*)
+	| Nil -> Const(Void)
+	(*| Pair (exp1, exp2) -> Seq ((tag_parse exp1) :: (tag_parse exp2) :: [])*) (*convert to quoted *)
 	| _ -> raise X_syntax_error;;
+
+
 
 (*tests*)
 let failure_info = ref "as not as expected"
@@ -141,4 +169,17 @@ test_function (Pair(Symbol("if"), Pair(Bool(true), Pair(String("a"), Pair(String
 				(If (Const(Sexpr(Bool(true))), Const(Sexpr(String("a"))), Const(Sexpr(String("b")))));;
 test_function (Pair(Symbol("if"), Pair(Bool(true), Pair(String("a"), Nil)))) 
 				(If (Const(Sexpr(Bool(true))), Const(Sexpr(String("a"))), Const(Void)));;
+(*or tests*)
+(* (or #t . #f) *)
+test_function (Pair(Symbol("or"), Pair(Bool(true),Bool(false)))), (Or(Const(Sexpr(Bool(true))) :: Const(Sexpr(Bool(false))) :: []));;
+(* (or #t  #f) *)
+test_function (Pair(Symbol("or"), Pair(Bool(true), Pair(Bool(false), Nil)))), (Or(Const(Sexpr(Bool(true))) :: Const(Sexpr(Bool(false))) :: []));;
+(* (or #t #t #t #f) *)
+test_function (Pair(Symbol("or"), Pair(Bool(true), Pair(Bool(true), Pair(Bool(true), Pair(Bool(false), Nil)))))), (Or(Const(Sexpr(Bool(true))) :: Const(Sexpr(Bool(true))) :: Const(Sexpr(Bool(true))):: Const(Sexpr(Bool(false))) :: []));;
+(* (or '(#t .#t) #t #f) *)
+(*test_function (Pair(Symbol("or"), Pair(Pair(Bool(true), Bool(true)), Pair(Bool(true), Pair(Bool(false), Nil))))), (Or(Seq(Const(Sexpr(Bool(true))) :: Const(Sexpr(Bool(true))) :: []) :: Const(Sexpr(Bool(true))) :: Const(Sexpr(Bool(false))) :: []));;
+*)
+(* or '(1 2) 3 *)
+test_function (Pair(Symbol ("or"), Pair(Pair(Symbol ("quote"), Pair(Pair(Number (Int 1), Pair(Number (Int 2), Nil)), Nil)), Pair(Number (Int 3), Nil)))) (Or(Seq(Const(Sexpr(Number(Int(1)))) :: Const(Sexpr(Number(Int(2)))) :: []) :: Const(Sexpr(Number(Int(3)))) :: []));;
+
 end;; (* struct Tag_Parser *)
