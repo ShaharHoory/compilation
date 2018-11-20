@@ -111,10 +111,19 @@ let rec tag_parse sexpr =
 	(*lambdas*)
 	(*|Pair(Symbol("lambda"), Pair (arglist, exprs)) -> *)
 	(*or *)
-	(*| Pair (Symbol("or"), Pair (exp1, exp2)) -> Or ((tag_parse exp1) :: (tag_parse exp2) :: [])*)
-	(*|Pair(proc,argsSeq) -> Applic ((tag_parse proc), (tag_parse argsSeq))*)
-	| Nil -> Const(Void)
-	(*| Pair (exp1, exp2) -> Seq ((tag_parse exp1) :: (tag_parse exp2) :: [])*) (*convert to quoted *)
+	(*TO NAAMA - this is how i treat implicit sequences - i add "begin" and then they're being treated as sequences 
+																			We should use this in lambdas etc.- TO NAAMA*)
+	| Pair (Symbol("or"), Pair (car, cdr)) -> Or(tag_parse Pair(Symbol("begin"), Pair(car, cdr)))
+	(*application*)
+	| Pair(proc, argsSeq) -> Applic ((tag_parse proc), (tag_parse Pair(Symbol("begin"), argsSeq)))
+	(*Explicit sequence*)
+	| Pair(Symbol("begin"), Nil) -> Const(Void)
+	| Pair(Symbol("begin"), Pair(s, Nil)) -> tag_parse s
+	| Pair(Symbol("begin"), Pair (car, cdr)) -> Seq([(tag_parse car); (tag_parse Pair(Symbol("begin"), cdr))])
+	(* TO NAAMA - 
+		Im afraid it might create Seq(..., (Seq(..., ...)))), but i think this is
+		how we should treat lists of exprs - with Seq (even according to Mayer)  - check this issue
+	TO NAAMA *)
 	| _ -> raise X_syntax_error;;
 
 
