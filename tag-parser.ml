@@ -97,24 +97,44 @@ let sexprToString symbolSexpr =
 let rec tag_parse sexpr = 
 	match sexpr with
 	(*constants*)
+	| Pair(sexpr, Nil) -> tag_parse sexpr (*This is how we get rid of Nil - this treats the last item on proper lists*)
 	| Bool(e) -> Const(Sexpr(Bool(e)))
-	| Number(Int(e_int))->Const(Sexpr(Number(Int(e_int))))
-	| Number(Float(e_float))->Const(Sexpr(Number(Float(e_float))))
-	| Char(e_char)->Const(Sexpr(Char(e_char)))
-	| String(e_string)->Const(Sexpr(String(e_string)))
-	| Pair(Symbol("quote"), e_sexpr)-> (tag_parse e_sexpr)
+	| Number(Int(e_int)) -> Const(Sexpr(Number(Int(e_int))))
+	| Number(Float(e_float)) -> Const(Sexpr(Number(Float(e_float))))
+	| Char(e_char) -> Const(Sexpr(Char(e_char)))
+	| String(e_string) -> Const(Sexpr(String(e_string)))
+	| Pair(Symbol("quote"), Pair(sexpr, Nil)) -> Const(sexpr) (*TO NAAMA-The previous implementation was incorrect because a recursive
+										call to tag_parse may not return Const - and quoted MUST be translated to Const - TO NAAMA*)
+	(*TODO: unquote ?*)
 	(*variables*)
 	| Symbol(e)->if (is_not_reserved_word e) then Var(e) else raise X_syntax_error
 	(*if expr*)
 	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Pair(e_else, Nil)))) -> If((tag_parse e_cond), (tag_parse e_then), (tag_parse e_else))
 	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Nil))) -> If((tag_parse e_cond), (tag_parse e_then), Const(Void))
-	(*lambdas*)
-	(*|Pair(Symbol("lambda"), Pair (arglist, exprs)) -> *)
+	(*Lambda Simple*)
+	(*TO NAAMA - the body has to be treated as an implicit sequence (according to Mayer) -i think adding "begin" before
+															it will make the exprs to be treated as sequence - TO NAAMA
+															Also, according to Shkufit 30 we need to check here:
+															-That the body is a proper list (it must be)
+															-The param list doesn't contain duplicates*)
+	(*|Pair(Symbol("lambda"), Pair (arglist, exprs)) -> *)	
 	(*or *)
-	(*| Pair (Symbol("or"), Pair (exp1, exp2)) -> Or ((tag_parse exp1) :: (tag_parse exp2) :: [])*)
-	(*|Pair(proc,argsSeq) -> Applic ((tag_parse proc), (tag_parse argsSeq))*)
-	| Nil -> Const(Void)
-	(*| Pair (exp1, exp2) -> Seq ((tag_parse exp1) :: (tag_parse exp2) :: [])*) (*convert to quoted *)
+	| Pair (Symbol("or"), Pair (car, cdr)) -> Or([tag_parse car; tag_parse cdr])
+	(*application*)
+	| Pair(proc, Pair(car, Nil)) -> Applic((tag_parse proc), [tag_parse car])
+	| Pair(proc, Pair(car, cdr)) -> Applic((tag_parse proc), [tag_parse car; tag_parse cdr])
+	| Pair(proc, oneArg) -> Applic((tag_parse proc), [tag_parse oneArg])	(*oneArg - a non-pair sexpr.
+																			I think we need this because a lambda with one parameter
+																			can be represented as Pair(proc, Pair(arg, Nil))
+																			as well as Pair(proc, arg) *)
+	(*Explicit Sequence*)
+	| Pair(Symbol("begin"), Nil) -> Const(Void)
+	| Pair(Symbol("begin"), Pair(s, Nil)) -> tag_parse s
+	| Pair(Symbol("begin"), Pair (car, cdr)) -> Seq([tag_parse car; tag_parse cdr])
+	(*Definitions*)
+	| Pair(Symbol("define"), Pair(Symbol(name), sexpr)) -> Def(tag_parse (Symbol(name)), tag_parse sexpr)
+	(*Assignments*)
+	| Pair(Symbol("set!"), Pair(Symbol(name), sexpr)) -> Set(tag_parse (Symbol(name)), tag_parse sexpr)
 	| _ -> raise X_syntax_error;;
 
 
