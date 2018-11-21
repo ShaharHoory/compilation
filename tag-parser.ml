@@ -93,13 +93,20 @@ let sexprToString symbolSexpr =
 	|_-> (sexprToString _);;
 *)
 
+let disj nt1 nt2 =
+  fun s ->
+  try (nt1 s)
+  with X_syntax_error -> (nt2 s);;
 
+let nt_none _ = raise X_syntax_error;;
+  
+let disj_list nts = List.fold_right disj nts nt_none;;
 
 let rec tag_parse sexpr = 
-	let parsers sexpr = 
-	match sexpr with
-	(*constants*)
-	| Pair(s, Nil) -> tag_parse s (*This is how we get rid of Nil - this treats the last item on proper lists*)
+let parsers = (disj_list [constParsers; ifParsers; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser]) in parsers sexpr 
+
+and constParsers sexpr = match sexpr with 
+	| Pair(s, Nil) -> (tag_parse s) (*This is how we get rid of Nil - this treats the last item on proper lists*)
 	| Bool(e) -> Const(Sexpr(Bool(e)))
 	| Number(Int(e_int)) -> Const(Sexpr(Number(Int(e_int))))
 	| Number(Float(e_float)) -> Const(Sexpr(Number(Float(e_float))))
@@ -107,41 +114,51 @@ let rec tag_parse sexpr =
 	| String(e_string) -> Const(Sexpr(String(e_string)))
 	| Pair(Symbol("quote"), Pair(s, Nil)) -> Const(Sexpr(s)) (*TO NAAMA-The previous implementation was incorrect because a recursive
 										call to tag_parse may not return Const - and quoted MUST be translated to Const - TO NAAMA*)
+	| _ -> raise X_syntax_error
 	(*TODO: unquote ?*)
-	(*variables*)
-	| Symbol(e)->if (is_not_reserved_word e) then Var(e) else raise X_syntax_error
-	(*if expr*)
+
+and ifParsers sexpr = match sexpr with
 	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Pair(e_else, Nil)))) -> If((tag_parse e_cond), (tag_parse e_then), (tag_parse e_else))
 	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Nil))) -> If((tag_parse e_cond), (tag_parse e_then), Const(Void))
-	(*Lambda Simple*)
-	(*|Pair(Symbol("lambda"), Pair (arglist, exprs)) -> *)	
-	(*or *)
+	| _ -> raise X_syntax_error
+
+and varParser sexpr = match sexpr with
+	| Symbol(e)->if (is_not_reserved_word e) then Var(e) else raise X_syntax_error
+	| _ -> raise X_syntax_error
+
+(* |Pair(Symbol("lambda"), Pair (arglist, exprs)) -> *)	
+and orParser sexpr = match sexpr with
 	| Pair (Symbol("or"), Pair (car, cdr)) -> Or(orHelper sexpr) 
-	(*application*)
+	| _ -> raise X_syntax_error
+
+and orHelper sexpr = match sexpr with 
+	| Pair(Symbol("or"),Nil) -> [Const(Sexpr(Bool(false)))]
+	| Pair(Symbol("or"),Pair (car, Nil)) -> [tag_parse car]
+	| Pair(Symbol("or"), Pair (car,cdr)) -> [tag_parse car] @ (orHelper (Pair(Symbol("or"), cdr)))
+	| _ -> raise X_syntax_error
+
+and applicationParser sexpr = match sexpr with
 	| Pair(proc, Pair(car, Nil)) -> Applic((tag_parse proc), [tag_parse car])
 	| Pair(proc, Pair(car, cdr)) -> Applic((tag_parse proc), [tag_parse car; tag_parse cdr])
 	| Pair(proc, oneArg) -> Applic((tag_parse proc), [tag_parse oneArg])	(*oneArg - a non-pair sexpr.
 																			I think we need this because a lambda with one parameter
 																			can be represented as Pair(proc, Pair(arg, Nil))
 																			as well as Pair(proc, arg) *)
-	(*Explicit Sequence*)
-	(*| Pair(Symbol("begin"), Nil) -> Const(Void)
+	| _ -> raise X_syntax_error
+
+and explicitSeqParser sexpr = match sexpr with
+	| Pair(Symbol("begin"), Nil) -> Const(Void)
 	| Pair(Symbol("begin"), Pair(s, Nil)) -> tag_parse s
 	| Pair(Symbol("begin"), Pair (car, cdr)) -> Seq([tag_parse car; tag_parse cdr])
-	(*Definitions*)
+	| _ -> raise X_syntax_error
+
+and definitionParser sexpr = match sexpr with
 	| Pair(Symbol("define"), Pair(Symbol(name), s)) -> Def(tag_parse (Symbol(name)), tag_parse s)
-	(*Assignments*)
-	| Pair(Symbol("set!"), Pair(Symbol(name), s)) -> Set(tag_parse (Symbol(name)), tag_parse s)*)
-	| _ -> raise X_syntax_error 
-in parsers sexpr
+	| _ -> raise X_syntax_error
 
-and orHelper sexpr = match sexpr with 
-| Pair(Symbol("or"),Nil) -> [Const(Sexpr(Bool(false)))]
-| Pair(Symbol("or"),Pair (car, Nil)) -> [tag_parse car]
-| Pair(Symbol("or"), Pair (car,cdr)) -> [tag_parse car] @ (orHelper (Pair(Symbol("or"), cdr)))
-| _ -> raise X_syntax_error;;
-
-
+and setBangParser sexpr = match sexpr with
+	| Pair(Symbol("set!"), Pair(Symbol(name), s)) -> Set(tag_parse (Symbol(name)), tag_parse s)
+	| _ -> raise X_syntax_error
 
 (*tests*)
 let failure_info = ref "as not as expected"
