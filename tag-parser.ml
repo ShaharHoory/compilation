@@ -94,16 +94,18 @@ let sexprToString symbolSexpr =
 *)
 
 
+
 let rec tag_parse sexpr = 
+	let parsers sexpr = 
 	match sexpr with
 	(*constants*)
-	| Pair(sexpr, Nil) -> tag_parse sexpr (*This is how we get rid of Nil - this treats the last item on proper lists*)
+	| Pair(s, Nil) -> tag_parse s (*This is how we get rid of Nil - this treats the last item on proper lists*)
 	| Bool(e) -> Const(Sexpr(Bool(e)))
 	| Number(Int(e_int)) -> Const(Sexpr(Number(Int(e_int))))
 	| Number(Float(e_float)) -> Const(Sexpr(Number(Float(e_float))))
 	| Char(e_char) -> Const(Sexpr(Char(e_char)))
 	| String(e_string) -> Const(Sexpr(String(e_string)))
-	| Pair(Symbol("quote"), Pair(sexpr, Nil)) -> Const(sexpr) (*TO NAAMA-The previous implementation was incorrect because a recursive
+	| Pair(Symbol("quote"), Pair(s, Nil)) -> Const(Sexpr(s)) (*TO NAAMA-The previous implementation was incorrect because a recursive
 										call to tag_parse may not return Const - and quoted MUST be translated to Const - TO NAAMA*)
 	(*TODO: unquote ?*)
 	(*variables*)
@@ -112,14 +114,9 @@ let rec tag_parse sexpr =
 	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Pair(e_else, Nil)))) -> If((tag_parse e_cond), (tag_parse e_then), (tag_parse e_else))
 	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Nil))) -> If((tag_parse e_cond), (tag_parse e_then), Const(Void))
 	(*Lambda Simple*)
-	(*TO NAAMA - the body has to be treated as an implicit sequence (according to Mayer) -i think adding "begin" before
-															it will make the exprs to be treated as sequence - TO NAAMA
-															Also, according to Shkufit 30 we need to check here:
-															-That the body is a proper list (it must be)
-															-The param list doesn't contain duplicates*)
 	(*|Pair(Symbol("lambda"), Pair (arglist, exprs)) -> *)	
 	(*or *)
-	| Pair (Symbol("or"), Pair (car, cdr)) -> Or([tag_parse car; tag_parse cdr])
+	| Pair (Symbol("or"), Pair (car, cdr)) -> Or(orHelper sexpr) 
 	(*application*)
 	| Pair(proc, Pair(car, Nil)) -> Applic((tag_parse proc), [tag_parse car])
 	| Pair(proc, Pair(car, cdr)) -> Applic((tag_parse proc), [tag_parse car; tag_parse cdr])
@@ -128,14 +125,21 @@ let rec tag_parse sexpr =
 																			can be represented as Pair(proc, Pair(arg, Nil))
 																			as well as Pair(proc, arg) *)
 	(*Explicit Sequence*)
-	| Pair(Symbol("begin"), Nil) -> Const(Void)
+	(*| Pair(Symbol("begin"), Nil) -> Const(Void)
 	| Pair(Symbol("begin"), Pair(s, Nil)) -> tag_parse s
 	| Pair(Symbol("begin"), Pair (car, cdr)) -> Seq([tag_parse car; tag_parse cdr])
 	(*Definitions*)
-	| Pair(Symbol("define"), Pair(Symbol(name), sexpr)) -> Def(tag_parse (Symbol(name)), tag_parse sexpr)
+	| Pair(Symbol("define"), Pair(Symbol(name), s)) -> Def(tag_parse (Symbol(name)), tag_parse s)
 	(*Assignments*)
-	| Pair(Symbol("set!"), Pair(Symbol(name), sexpr)) -> Set(tag_parse (Symbol(name)), tag_parse sexpr)
-	| _ -> raise X_syntax_error;;
+	| Pair(Symbol("set!"), Pair(Symbol(name), s)) -> Set(tag_parse (Symbol(name)), tag_parse s)*)
+	| _ -> raise X_syntax_error 
+in parsers sexpr
+
+and orHelper sexpr = match sexpr with 
+| Pair(Symbol("or"),Nil) -> [Const(Sexpr(Bool(false)))]
+| Pair(Symbol("or"),Pair (car, Nil)) -> [tag_parse car]
+| Pair(Symbol("or"), Pair (car,cdr)) -> [tag_parse car] @ (orHelper (Pair(Symbol("or"), cdr)))
+| _ -> raise X_syntax_error;;
 
 
 
@@ -189,17 +193,11 @@ test_function (Pair(Symbol("if"), Pair(Bool(true), Pair(String("a"), Pair(String
 				(If (Const(Sexpr(Bool(true))), Const(Sexpr(String("a"))), Const(Sexpr(String("b")))));;
 test_function (Pair(Symbol("if"), Pair(Bool(true), Pair(String("a"), Nil)))) 
 				(If (Const(Sexpr(Bool(true))), Const(Sexpr(String("a"))), Const(Void)));;
-(*or tests*)
-(* (or #t . #f) *)
-test_function (Pair(Symbol("or"), Pair(Bool(true),Bool(false)))), (Or(Const(Sexpr(Bool(true))) :: Const(Sexpr(Bool(false))) :: []));;
-(* (or #t  #f) *)
-test_function (Pair(Symbol("or"), Pair(Bool(true), Pair(Bool(false), Nil)))), (Or(Const(Sexpr(Bool(true))) :: Const(Sexpr(Bool(false))) :: []));;
-(* (or #t #t #t #f) *)
-test_function (Pair(Symbol("or"), Pair(Bool(true), Pair(Bool(true), Pair(Bool(true), Pair(Bool(false), Nil)))))), (Or(Const(Sexpr(Bool(true))) :: Const(Sexpr(Bool(true))) :: Const(Sexpr(Bool(true))):: Const(Sexpr(Bool(false))) :: []));;
-(* (or '(#t .#t) #t #f) *)
-(*test_function (Pair(Symbol("or"), Pair(Pair(Bool(true), Bool(true)), Pair(Bool(true), Pair(Bool(false), Nil))))), (Or(Seq(Const(Sexpr(Bool(true))) :: Const(Sexpr(Bool(true))) :: []) :: Const(Sexpr(Bool(true))) :: Const(Sexpr(Bool(false))) :: []));;
-*)
-(* or '(1 2) 3 *)
-test_function (Pair(Symbol ("or"), Pair(Pair(Symbol ("quote"), Pair(Pair(Number (Int 1), Pair(Number (Int 2), Nil)), Nil)), Pair(Number (Int 3), Nil)))) (Or(Seq(Const(Sexpr(Number(Int(1)))) :: Const(Sexpr(Number(Int(2)))) :: []) :: Const(Sexpr(Number(Int(3)))) :: []));;
+
+(*or test*)
+test_function (Pair(Symbol "or", Pair(Pair(Symbol "quote", Pair(Symbol "a", Nil)), Nil))) (Or([Const (Sexpr (Symbol "a"))]));;
+(*'(or #t #f 'a')*)
+test_function (Pair(Symbol "or", Pair(Bool true, Pair(Bool false, Pair(Pair(Symbol "quote", Pair(Char 'a', Nil)), Nil))))) 
+	((Or [Const (Sexpr (Bool true)); Const (Sexpr (Bool false)); Const (Sexpr (Char 'a'))]));;
 
 end;; (* struct Tag_Parser *)
