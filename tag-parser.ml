@@ -102,8 +102,26 @@ let nt_none _ = raise X_syntax_error;;
   
 let disj_list nts = List.fold_right disj nts nt_none;;
 
+
+(*let helpers*)
+let rec extractVarsFromLet sexpr = match sexpr with
+	| Pair(Pair(Symbol(sym), Nil), ribs) -> raise X_syntax_error (*let (x) (body) with no assignment to x is illegal*)
+	| Pair(Symbol(sym), Nil) -> raise X_syntax_error (*same reason*)
+	| Pair(Pair(Symbol(sym), value), Nil) -> Pair(Symbol(sym), Nil)
+	| Pair(Symbol(sym), value) -> Pair(Symbol(sym), Nil) (*improper list case of the above case*)
+	| Pair(Pair(Symbol(sym), value), ribs) -> Pair(Symbol(sym), extractVarsFromLet ribs)
+	| _ -> raise X_syntax_error
+
+let rec extractSexprsFromLet sexpr = match sexpr with
+	| Pair(Pair(Symbol(sym), Nil), ribs) -> raise X_syntax_error (*let (x) (body) with no assignment to x is illegal*)
+	| Pair(Symbol(sym), Nil) -> raise X_syntax_error (*same reason*)
+	| Pair(Pair(Symbol(sym), sexp), Nil) -> sexp
+	| Pair(Symbol(sym), sexp) -> sexp (*improper list case of the above case*)
+	| Pair(Pair(Symbol(sym), sexp), ribs) -> Pair(sexp, extractSexprsFromLet ribs)
+	| _ -> raise X_syntax_error
+
 let rec tag_parse sexpr = 
-let parsers = (disj_list [constParsers; ifParsers; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; (*letParsers*)]) in parsers sexpr 
+let parsers = (disj_list [constParsers; ifParsers; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers]) in parsers sexpr 
 
 and constParsers sexpr = match sexpr with 
 	| Pair(s, Nil) -> (tag_parse s) (*This is how we get rid of Nil - this treats the last item on proper lists*)
@@ -138,16 +156,16 @@ and orHelper sexpr = match sexpr with
 	| _ -> raise X_syntax_error
 
 and applicationParser sexpr = match sexpr with
-	| Pair(proc, Pair(car, cdr)) -> Applic((tag_parse proc), (applicationHelper (Pair(car, cdr))))
-	| Pair(proc, oneArg) -> Applic((tag_parse proc), [tag_parse oneArg])	(*oneArg - a non-pair sexpr.
-																			I think we need this because a lambda with one parameter
-																			can be represented as Pair(proc, Pair(arg, Nil))
-																			as well as Pair(proc, arg) *)
+	| Pair(proc, args) -> Applic((tag_parse proc), (applicationHelper args))
+	(*TO THINK: Can an applic expression on 0 arguments be like am improper list? like: (.(lambda () 1))
+	 and if it does - HANDLE THIS! *)
 	| _ -> raise X_syntax_error
 
 and applicationHelper sexpr = match sexpr with
 	| Pair(car, Nil) -> [tag_parse car]
 	| Pair(car, cdr) -> [tag_parse car] @ (applicationHelper cdr)
+	| Nil -> []
+	| oneArg -> [tag_parse oneArg]
 	| _ -> raise X_syntax_error
 
 and explicitSeqParser sexpr = match sexpr with
@@ -169,9 +187,19 @@ and setBangParser sexpr = match sexpr with
 	| Pair(Symbol("set!"), Pair(Symbol(name), s)) -> Set(tag_parse (Symbol(name)), tag_parse s)
 	| _ -> raise X_syntax_error
 
-(*and letParsers sexpr = match sexpr with
-	| Pair(Symbol("let"), Pair(Nil, Pair(body, Nil))) -> tag_parse Pair(Symbol("lambda"), Pair(Nil, body))*)
+and letParsers sexpr = match sexpr with
+	| Pair(Symbol("let"), Pair(ribs, Nil)) -> raise X_syntax_error (*let withous body is invalid*)
+	| Pair(Symbol("let"), Pair(Nil, body)) -> tag_parse (Pair(Pair(Symbol("lambda"), Pair(Nil, body)), Nil))
+	(*| Pair(Symbol("let"), Pair(Nil, Pair(body, Nil))) -> tag_parse (Pair(Pair(Symbol("lambda"), Pair(Nil, body)), Nil)) I THINK that
+																								the above's case covers also this case*)
+	| Pair(Symbol("let"), Pair(Pair(rib, ribs), body)) -> tag_parse (Pair(Pair(Symbol("lambda"), Pair(extractVarsFromLet (Pair(rib, ribs)), body)), extractSexprsFromLet (Pair(rib, ribs))))
+	(*| Pair(Symbol("let"), Pair(Pair(rib, ribs), Pair(body, Nil))) -> tag_parse (Pair(Pair(Symbol("lambda"), Pair(extractVarsFromLet (Pair(rib, ribs)), body)), extractSexprsFromLet (Pair(rib, ribs))))
+																											same comment for here too*)
+	| _ -> raise X_syntax_error
 
+
+(*Pair(Symbol "let", Pair(Pair(Symbol "x", Pair(Number (Int 1), Nil)), Pair(Pair(Symbol "y", Pair(Number (Int 2), Nil)), Pair(Symbol "x", Nil))))
+rib - assignment, ribs - the rest assignments - ribs = Pair(Pair(rib2, ribs2), Pair(body, Nil)) *)
 
 (*tests*)
 let failure_info = ref "as not as expected"
@@ -182,7 +210,7 @@ let rec print_sexpr = fun sexprObj ->
   match sexprObj  with
     | Bool(true) -> "Bool(true)"
     | Bool(false) -> "Bool(false)"
-    | Nil -> "Nill"
+    | Nil -> "Nil"
     | Number(Int(e)) -> Printf.sprintf "Number(Int(%d))" e
     | Number(Float(e)) -> Printf.sprintf "Number(Float(%f))" e
     | Char(e) -> Printf.sprintf "Char(%c)" e
@@ -203,10 +231,12 @@ let print_sexprs_as_list = fun sexprList ->
     "[ " ^ sexprsString ^ " ]";;
 
 
-
-
 let test_function sexpr expected_expr = 
 	let check =  expr_eq (tag_parse sexpr) expected_expr in
+	if check = false then print_string("problem with sexpr "^(print_sexpr sexpr)^"\n");;
+
+let test_sexprs_equal sexpr expected_sexpr = 
+	let check =  sexpr_eq sexpr expected_sexpr in
 	if check = false then print_string("problem with sexpr "^(print_sexpr sexpr)^"\n");;
 
 (*test const*)
@@ -229,5 +259,34 @@ test_function (Pair(Symbol "or", Pair(Pair(Symbol "quote", Pair(Symbol "a", Nil)
 (*'(or #t #f 'a')*)
 test_function (Pair(Symbol "or", Pair(Bool true, Pair(Bool false, Pair(Pair(Symbol "quote", Pair(Char 'a', Nil)), Nil))))) 
 	((Or [Const (Sexpr (Bool true)); Const (Sexpr (Bool false)); Const (Sexpr (Char 'a'))]));;
+
+(*tests for let helpers*)
+(*extractVarsFromLet*)
+test_sexprs_equal (extractVarsFromLet (Pair(Symbol("x"), Pair(Number(Int 1), Nil)))) (Pair(Symbol("x"), Nil));;
+test_sexprs_equal (extractVarsFromLet (Pair((Pair(Symbol("x"), Number(Int 1)), Pair(Symbol("y"), Pair(Number(Int(2)), Nil)))))) (Pair(Symbol("x"), Pair(Symbol("y"), Nil)));;
+(*improper case*)
+test_sexprs_equal (extractVarsFromLet (Pair((Pair(Symbol("x"), Number(Int 1)), Pair(Symbol("y"), Number(Int(2))))))) (Pair(Symbol("x"), Pair(Symbol("y"), Nil)));;
+
+(*extractSexprsFromLet*)
+test_sexprs_equal (extractSexprsFromLet (Pair(Symbol("x"), Pair(Number(Int 1), Nil)))) (Pair(Number(Int(1)), Nil));;
+test_sexprs_equal (extractSexprsFromLet (Pair((Pair(Symbol("x"), Number(Int 1)), Pair(Symbol("y"), Pair(Number(Int(2)), Nil)))))) (Pair(Number(Int(1)), Pair(Number(Int(2)), Nil)));;
+(*improper case*)
+test_sexprs_equal (extractSexprsFromLet (Pair((Pair(Symbol("x"), Number(Int 1)), Pair(Symbol("y"), Number(Int(2))))))) (Pair(Number(Int(1)), Number(Int(2)))
+);;
+
+(*let tests*)
+let letParsersToSexpr sexpr = 
+	match sexpr with
+		| Pair(Symbol("let"), Pair(ribs, Nil)) -> raise X_syntax_error (*let without body is invalid*)
+		| Pair(Symbol("let"), Pair(Nil, body)) -> Pair(Pair(Symbol("lambda"), Pair(Nil, body)), Nil)
+		(*| Pair(Symbol("let"), Pair(Nil, Pair(body, Nil))) -> tag_parse (Pair(Pair(Symbol("lambda"), Pair(Nil, body)), Nil)) I THINK that
+																									the above's case covers also this case*)
+		| Pair(Symbol("let"), Pair(Pair(rib, ribs), body)) -> Pair(Pair(Symbol("lambda"), Pair(extractVarsFromLet (Pair(rib, ribs)), body)), extractSexprsFromLet (Pair(rib, ribs)))
+		(*| Pair(Symbol("let"), Pair(Pair(rib, ribs), Pair(body, Nil))) -> tag_parse (Pair(Pair(Symbol("lambda"), Pair(extractVarsFromLet (Pair(rib, ribs)), body)), extractSexprsFromLet (Pair(rib, ribs))))
+																											same comment for here too*)
+		| _ -> raise X_syntax_error;;
+
+test_sexprs_equal (letParsersToSexpr (Pair(Symbol("let"), Pair(Nil, Pair(Number (Int 1), Nil))))) (Pair(Pair(Symbol("lambda"), Pair(Nil, Pair(Number (Int 1), Nil))), Nil));;
+test_sexprs_equal (letParsersToSexpr (Pair(Symbol("let"), Pair(Pair(Symbol("x"), Pair(Number(Int 1), Nil)), Symbol("x"))))) (Pair(Pair(Symbol("lambda"), Pair(Pair(Symbol("x"), Nil), Symbol("x"))), Pair(Number(Int 1), Nil)));;
 
 end;; (* struct Tag_Parser *)
