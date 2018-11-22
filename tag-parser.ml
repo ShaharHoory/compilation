@@ -50,6 +50,8 @@ let rec expr_eq e1 e2 =
 
                        
 exception X_syntax_error;;
+exception X_list_error;;
+exception X_list_2_error;;
 
 module type TAG_PARSER = sig
   val tag_parse_expression : sexpr -> expr
@@ -86,12 +88,12 @@ let sexprToString symbolSexpr =
 	|Symbol (s) -> s
 	|_-> raise X_syntax_error;;
 
-(*let rec makeStringList arglist = 
+let rec makeStringList arglist = 
 	match arglist with
-	|Pair (exp1, exp2) -> (sexprToString exp1) :: (makeStringList exp2):: []
-	|Nil -> []
-	|_-> (sexprToString _);;
-*)
+	|Pair (exp1, Nil) -> (sexprToString exp1) :: []
+	|Pair (exp1, exp2) -> [sexprToString exp1] @ (makeStringList exp2)
+	|_-> raise X_syntax_error;;
+
 
 let disj nt1 nt2 =
   fun s ->
@@ -101,6 +103,8 @@ let disj nt1 nt2 =
 let nt_none _ = raise X_syntax_error;;
   
 let disj_list nts = List.fold_right disj nts nt_none;;
+
+
 
 let rec tag_parse sexpr = 
 let parsers = (disj_list [constParsers; ifParsers; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; (*letParsers*)]) in parsers sexpr 
@@ -121,6 +125,10 @@ and ifParsers sexpr = match sexpr with
 	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Pair(e_else, Nil)))) -> If((tag_parse e_cond), (tag_parse e_then), (tag_parse e_else))
 	| _ -> raise X_syntax_error
 
+(*and lambdaParser sexpr = match sexpr with
+	| Pair(Symbol "lambda", Pair(arguments, Pair(body, Nil))) -> LambdaSimple((makeStringList arguments), (tag_parse (Pair(Symbol("begin"),body))))
+	| _ -> raise X_syntax_error
+*)
 and varParser sexpr = match sexpr with
 	| Symbol(e)->if (is_not_reserved_word e) then Var(e) else raise X_syntax_error
 	| _ -> raise X_syntax_error
@@ -159,7 +167,7 @@ and explicitSeqParser sexpr = match sexpr with
 and explicitSeqHelper sexpr = match sexpr with 
 	| Pair(Symbol("begin"), Pair(car, Nil)) -> [tag_parse car]
 	| Pair(Symbol("begin"), Pair(car, cdr)) -> [tag_parse car] @ (explicitSeqHelper (Pair(Symbol("begin"), cdr)))
-	| _ -> raise X_syntax_error
+	| _ -> raise X_list_error
 
 and definitionParser sexpr = match sexpr with
 	| Pair(Symbol("define"), Pair(Symbol(name), s)) -> Def(tag_parse (Symbol(name)), tag_parse s)
@@ -229,5 +237,11 @@ test_function (Pair(Symbol "or", Pair(Pair(Symbol "quote", Pair(Symbol "a", Nil)
 (*'(or #t #f 'a')*)
 test_function (Pair(Symbol "or", Pair(Bool true, Pair(Bool false, Pair(Pair(Symbol "quote", Pair(Char 'a', Nil)), Nil))))) 
 	((Or [Const (Sexpr (Bool true)); Const (Sexpr (Bool false)); Const (Sexpr (Char 'a'))]));;
+(*lambda tetsts*)
+(* (lambda (x) 4) *)
+(*test_function (Pair(Symbol "lambda", Pair(Pair(Symbol "x", Nil), Pair(Number (Int 4), Nil)))) (LambdaSimple(["x"], Const(Sexpr(Number(Int(4))))))
+*)
 
+(*tag_parse (Pair(Symbol("begin"),Pair(Number (Int 4), Number(Int(4)))));;
+*)
 end;; (* struct Tag_Parser *)
