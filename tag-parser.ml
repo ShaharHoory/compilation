@@ -103,7 +103,7 @@ let nt_none _ = raise X_syntax_error;;
 let disj_list nts = List.fold_right disj nts nt_none;;
 
 let rec tag_parse sexpr = 
-let parsers = (disj_list [constParsers; ifParsers; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser]) in parsers sexpr 
+let parsers = (disj_list [constParsers; ifParsers; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; (*letParsers*)]) in parsers sexpr 
 
 and constParsers sexpr = match sexpr with 
 	| Pair(s, Nil) -> (tag_parse s) (*This is how we get rid of Nil - this treats the last item on proper lists*)
@@ -151,12 +151,12 @@ and applicationHelper sexpr = match sexpr with
 	| _ -> raise X_syntax_error
 
 and explicitSeqParser sexpr = match sexpr with
+	| Pair(Symbol("begin"), Nil) -> Const(Void)
 	| Pair(Symbol("begin"), Pair(car, cdr)) -> Seq(explicitSeqHelper sexpr)
-	| Pair(Symbol("begin"), oneArg) -> Seq([tag_parse oneArg])
+	| Pair(Symbol("begin"), oneArg) -> tag_parse oneArg
 	| _ -> raise X_syntax_error
 
 and explicitSeqHelper sexpr = match sexpr with 
-	| Pair(Symbol("begin"), Nil) -> [Const(Void)]
 	| Pair(Symbol("begin"), Pair(car, Nil)) -> [tag_parse car]
 	| Pair(Symbol("begin"), Pair(car, cdr)) -> [tag_parse car] @ (explicitSeqHelper (Pair(Symbol("begin"), cdr)))
 	| _ -> raise X_syntax_error
@@ -168,6 +168,10 @@ and definitionParser sexpr = match sexpr with
 and setBangParser sexpr = match sexpr with
 	| Pair(Symbol("set!"), Pair(Symbol(name), s)) -> Set(tag_parse (Symbol(name)), tag_parse s)
 	| _ -> raise X_syntax_error
+
+(*and letParsers sexpr = match sexpr with
+	| Pair(Symbol("let"), Pair(Nil, Pair(body, Nil))) -> tag_parse Pair(Symbol("lambda"), Pair(Nil, body))*)
+
 
 (*tests*)
 let failure_info = ref "as not as expected"
