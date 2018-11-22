@@ -112,14 +112,13 @@ and constParsers sexpr = match sexpr with
 	| Number(Float(e_float)) -> Const(Sexpr(Number(Float(e_float))))
 	| Char(e_char) -> Const(Sexpr(Char(e_char)))
 	| String(e_string) -> Const(Sexpr(String(e_string)))
-	| Pair(Symbol("quote"), Pair(s, Nil)) -> Const(Sexpr(s)) (*TO NAAMA-The previous implementation was incorrect because a recursive
-										call to tag_parse may not return Const - and quoted MUST be translated to Const - TO NAAMA*)
+	| Pair(Symbol("quote"), Pair(s, Nil)) -> Const(Sexpr(s))
 	| _ -> raise X_syntax_error
 	(*TODO: unquote ?*)
 
 and ifParsers sexpr = match sexpr with
-	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Pair(e_else, Nil)))) -> If((tag_parse e_cond), (tag_parse e_then), (tag_parse e_else))
 	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Nil))) -> If((tag_parse e_cond), (tag_parse e_then), Const(Void))
+	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Pair(e_else, Nil)))) -> If((tag_parse e_cond), (tag_parse e_then), (tag_parse e_else))
 	| _ -> raise X_syntax_error
 
 and varParser sexpr = match sexpr with
@@ -129,6 +128,7 @@ and varParser sexpr = match sexpr with
 (* |Pair(Symbol("lambda"), Pair (arglist, exprs)) -> *)	
 and orParser sexpr = match sexpr with
 	| Pair (Symbol("or"), Pair (car, cdr)) -> Or(orHelper sexpr) 
+	| Pair (Symbol("or"), oneArg) -> Or([tag_parse oneArg]) (*treats improper list of arguments with one arg as the Or input *)
 	| _ -> raise X_syntax_error
 
 and orHelper sexpr = match sexpr with 
@@ -138,18 +138,28 @@ and orHelper sexpr = match sexpr with
 	| _ -> raise X_syntax_error
 
 and applicationParser sexpr = match sexpr with
-	| Pair(proc, Pair(car, Nil)) -> Applic((tag_parse proc), [tag_parse car])
-	| Pair(proc, Pair(car, cdr)) -> Applic((tag_parse proc), [tag_parse car; tag_parse cdr])
+	| Pair(proc, Pair(car, cdr)) -> Applic((tag_parse proc), (applicationHelper Pair(car, cdr)))
 	| Pair(proc, oneArg) -> Applic((tag_parse proc), [tag_parse oneArg])	(*oneArg - a non-pair sexpr.
 																			I think we need this because a lambda with one parameter
 																			can be represented as Pair(proc, Pair(arg, Nil))
 																			as well as Pair(proc, arg) *)
 	| _ -> raise X_syntax_error
 
+and applicationHelper sexpr = match sexpr with
+	| sexp -> [tag_parse sexp]
+	| Pair(car, Nil) -> [tag_parse car]
+	| Pair(car, cdr) -> [tag_parse car @ (applicationHelper cdr)]
+	| _ -> raise X_syntax_error
+
 and explicitSeqParser sexpr = match sexpr with
-	| Pair(Symbol("begin"), Nil) -> Const(Void)
-	| Pair(Symbol("begin"), Pair(s, Nil)) -> tag_parse s
-	| Pair(Symbol("begin"), Pair (car, cdr)) -> Seq([tag_parse car; tag_parse cdr])
+	| Pair(Symbol("begin"), Pair(car, cdr)) -> Seq(explicitSeqHelper sexpr)
+	| Pair(Symbol("begin"), oneArg) -> Seq([tag_parse oneArg])
+	| _ -> raise X_syntax_error
+
+and explicitSeqHelper sexpr = match sexpr with 
+	| Pair(Symbol("begin"), Nil) -> [Const(Void)]
+	| Pair(Symbol("begin"), Pair(car, Nil)) -> [tag_parse s]
+	| Pair(Symbol("begin"), Pair(car, cdr)) -> [tag_parse car] @ (explicitSeqHelper (Pair(Symbol("begin"), cdr)))
 	| _ -> raise X_syntax_error
 
 and definitionParser sexpr = match sexpr with
