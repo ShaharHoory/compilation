@@ -138,7 +138,7 @@ and orHelper sexpr = match sexpr with
 	| _ -> raise X_syntax_error
 
 and applicationParser sexpr = match sexpr with
-	| Pair(proc, Pair(car, cdr)) -> Applic((tag_parse proc), (applicationHelper Pair(car, cdr)))
+	| Pair(proc, Pair(car, cdr)) -> Applic((tag_parse proc), (applicationHelper (Pair(car, cdr))))
 	| Pair(proc, oneArg) -> Applic((tag_parse proc), [tag_parse oneArg])	(*oneArg - a non-pair sexpr.
 																			I think we need this because a lambda with one parameter
 																			can be represented as Pair(proc, Pair(arg, Nil))
@@ -146,9 +146,8 @@ and applicationParser sexpr = match sexpr with
 	| _ -> raise X_syntax_error
 
 and applicationHelper sexpr = match sexpr with
-	| sexp -> [tag_parse sexp]
 	| Pair(car, Nil) -> [tag_parse car]
-	| Pair(car, cdr) -> [tag_parse car @ (applicationHelper cdr)]
+	| Pair(car, cdr) -> [tag_parse car] @ (applicationHelper cdr)
 	| _ -> raise X_syntax_error
 
 and explicitSeqParser sexpr = match sexpr with
@@ -158,7 +157,7 @@ and explicitSeqParser sexpr = match sexpr with
 
 and explicitSeqHelper sexpr = match sexpr with 
 	| Pair(Symbol("begin"), Nil) -> [Const(Void)]
-	| Pair(Symbol("begin"), Pair(car, Nil)) -> [tag_parse s]
+	| Pair(Symbol("begin"), Pair(car, Nil)) -> [tag_parse car]
 	| Pair(Symbol("begin"), Pair(car, cdr)) -> [tag_parse car] @ (explicitSeqHelper (Pair(Symbol("begin"), cdr)))
 	| _ -> raise X_syntax_error
 
