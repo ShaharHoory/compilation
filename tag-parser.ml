@@ -81,7 +81,10 @@ let rec isProperList arglist =
 	match arglist with
 	|Pair (exp1, Nil)-> true
 	|Pair (exp1, Pair(exp_1, exp_2)) -> isProperList (Pair(exp_1, exp_2))
+	|Nil->true
 	|_-> false ;;
+
+
 
 let sexprToString symbolSexpr = 
 	match symbolSexpr with
@@ -92,8 +95,20 @@ let rec makeStringList arglist =
 	match arglist with
 	|Pair (exp1, Nil) -> (sexprToString exp1) :: []
 	|Pair (exp1, exp2) -> [sexprToString exp1] @ (makeStringList exp2)
+	| Nil -> []
 	|_-> raise X_syntax_error;;
 
+(*return array with uniq elements only*)
+let rec uniq x =
+  let rec uniq_help l n = 
+    match l with
+    | [] -> []
+    | h :: t -> if n = h then uniq_help t n else h::(uniq_help t n) in
+  match x with
+  | [] -> []
+  | h::t -> h::(uniq_help (uniq t) h);;
+
+let isUniq x = List.length (uniq x) == List.length (x);;
 
 let disj nt1 nt2 =
   fun s ->
@@ -107,7 +122,7 @@ let disj_list nts = List.fold_right disj nts nt_none;;
 
 
 let rec tag_parse sexpr = 
-let parsers = (disj_list [constParsers; ifParsers; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; (*letParsers*)]) in parsers sexpr 
+let parsers = (disj_list [constParsers; ifParsers; varParser; orParser; lambdaParser; applicationParser; definitionParser; setBangParser; explicitSeqParser;(*letParsers*)]) in parsers sexpr 
 
 and constParsers sexpr = match sexpr with 
 	| Pair(s, Nil) -> (tag_parse s) (*This is how we get rid of Nil - this treats the last item on proper lists*)
@@ -125,10 +140,14 @@ and ifParsers sexpr = match sexpr with
 	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Pair(e_else, Nil)))) -> If((tag_parse e_cond), (tag_parse e_then), (tag_parse e_else))
 	| _ -> raise X_syntax_error
 
-(*and lambdaParser sexpr = match sexpr with
-	| Pair(Symbol "lambda", Pair(arguments, Pair(body, Nil))) -> LambdaSimple((makeStringList arguments), (tag_parse (Pair(Symbol("begin"),body))))
+and lambdaParser sexpr = match sexpr with
+	| Pair(Symbol "lambda", Pair(arguments, body)) -> 
+		let arglist = (makeStringList arguments) in
+if ((isUniq arglist) && (isProperList arguments) && (andmap is_not_reserved_word arglist)) 
+			then LambdaSimple(arglist, tag_parse(Pair(Symbol("begin"),body))) 
+		else raise X_syntax_error
 	| _ -> raise X_syntax_error
-*)
+
 and varParser sexpr = match sexpr with
 	| Symbol(e)->if (is_not_reserved_word e) then Var(e) else raise X_syntax_error
 	| _ -> raise X_syntax_error
@@ -160,6 +179,7 @@ and applicationHelper sexpr = match sexpr with
 
 and explicitSeqParser sexpr = match sexpr with
 	| Pair(Symbol("begin"), Nil) -> Const(Void)
+	| Pair(Symbol("begin"), Pair(car, Nil)) -> tag_parse car
 	| Pair(Symbol("begin"), Pair(car, cdr)) -> Seq(explicitSeqHelper sexpr)
 	| Pair(Symbol("begin"), oneArg) -> tag_parse oneArg
 	| _ -> raise X_syntax_error
@@ -237,11 +257,12 @@ test_function (Pair(Symbol "or", Pair(Pair(Symbol "quote", Pair(Symbol "a", Nil)
 (*'(or #t #f 'a')*)
 test_function (Pair(Symbol "or", Pair(Bool true, Pair(Bool false, Pair(Pair(Symbol "quote", Pair(Char 'a', Nil)), Nil))))) 
 	((Or [Const (Sexpr (Bool true)); Const (Sexpr (Bool false)); Const (Sexpr (Char 'a'))]));;
-(*lambda tetsts*)
+(*lambda simple tetsts*)
 (* (lambda (x) 4) *)
-(*test_function (Pair(Symbol "lambda", Pair(Pair(Symbol "x", Nil), Pair(Number (Int 4), Nil)))) (LambdaSimple(["x"], Const(Sexpr(Number(Int(4))))))
-*)
+test_function (Pair(Symbol "lambda", Pair(Pair(Symbol "x", Nil), Pair(Number(Int 4), Nil)))) (LambdaSimple(["x"], Const(Sexpr(Number(Int(4))))));;
+test_function (Pair(Symbol "lambda", Pair(Nil, Pair(Number (Int 4), Nil)))) (LambdaSimple([], Const(Sexpr(Number(Int(4))))));;
+test_function (Pair(Pair(Symbol "lambda", Pair(Nil, Pair(Symbol "e", Pair(Symbol "f", Nil)))), Nil)) (LambdaSimple( [], Seq [Var "e"; Var "f"])) ;;
+test_function (Pair(Symbol "lambda", Pair(Pair(Symbol "a", Pair(Symbol "b", Pair(Symbol "c", Nil))), Pair(Pair(Symbol "begin", Pair(Symbol "a", Pair(Symbol "b", Nil))), Nil))))
+	(LambdaSimple (["a"; "b"; "c"], Seq [Var "a"; Var "b"]));;
 
-(*tag_parse (Pair(Symbol("begin"),Pair(Number (Int 4), Number(Int(4)))));;
-*)
 end;; (* struct Tag_Parser *)
