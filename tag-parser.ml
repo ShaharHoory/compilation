@@ -151,7 +151,7 @@ let rec extractSexprsFromLet sexpr = match sexpr with
 	| _ -> raise X_syntax_error
 
 let rec tag_parse sexpr = 
-let parsers = (disj_list [constParsers; ifParsers;lambdaParser; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers]) in parsers sexpr 
+let parsers = (disj_list [constParsers; ifParsers;lambdaParser; quasiquoteParser; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers]) in parsers sexpr 
 
 and quasiquoteParser sexpr = match sexpr with
 	|Pair(Symbol "quasiquote", Pair(s,Nil)) -> tag_parse (quasiQuote_expander s)
@@ -209,7 +209,7 @@ and applicationHelper sexpr = match sexpr with
 	| Pair(car, cdr) -> [tag_parse car] @ (applicationHelper cdr)
 	| Nil -> []
 	| oneArg -> [tag_parse oneArg]
-	| _ -> raise X_syntax_error
+(*	| _ -> raise X_syntax_error *)
 
 and explicitSeqParser sexpr = match sexpr with
 	| Pair(Symbol("begin"), Nil) -> Const(Void)
