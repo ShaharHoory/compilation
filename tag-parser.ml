@@ -138,7 +138,7 @@ let rec extractSexprsFromLet sexpr = match sexpr with
 	| _ -> raise X_syntax_error
 
 let rec tag_parse sexpr = 
-let parsers = (disj_list [constParsers; ifParsers; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers]) in parsers sexpr 
+let parsers = (disj_list [constParsers; ifParsers;lambdaParser; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers]) in parsers sexpr 
 
 and constParsers sexpr = match sexpr with 
 	| Pair(s, Nil) -> (tag_parse s) (*This is how we get rid of Nil - this treats the last item on proper lists*)
