@@ -141,7 +141,7 @@ let rec tag_parse sexpr =
 let parsers = (disj_list [constParsers; ifParsers;lambdaParser; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers]) in parsers sexpr 
 
 and constParsers sexpr = match sexpr with 
-	| Pair(s, Nil) -> (tag_parse s) (*This is how we get rid of Nil - this treats the last item on proper lists*)
+	(*Pair(s, Nil) -> (tag_parse s) *)(*This is how we get rid of Nil - this treats the last item on proper lists*)
 	| Bool(e) -> Const(Sexpr(Bool(e)))
 	| Number(Int(e_int)) -> Const(Sexpr(Number(Int(e_int))))
 	| Number(Float(e_float)) -> Const(Sexpr(Number(Float(e_float))))
@@ -289,9 +289,11 @@ test_function (Pair(Symbol "or", Pair(Bool true, Pair(Bool false, Pair(Pair(Symb
 (* (lambda (x) 4) *)
 test_function (Pair(Symbol "lambda", Pair(Pair(Symbol "x", Nil), Pair(Number(Int 4), Nil)))) (LambdaSimple(["x"], Const(Sexpr(Number(Int(4))))));;
 test_function (Pair(Symbol "lambda", Pair(Nil, Pair(Number (Int 4), Nil)))) (LambdaSimple([], Const(Sexpr(Number(Int(4))))));;
-test_function (Pair(Pair(Symbol "lambda", Pair(Nil, Pair(Symbol "e", Pair(Symbol "f", Nil)))), Nil)) (LambdaSimple( [], Seq [Var "e"; Var "f"])) ;;
+test_function (Pair(Symbol "lambda", Pair(Nil, Pair(Symbol "e", Pair(Symbol "f", Nil))))) (LambdaSimple( [], Seq [Var "e"; Var "f"])) ;;
 test_function (Pair(Symbol "lambda", Pair(Pair(Symbol "a", Pair(Symbol "b", Pair(Symbol "c", Nil))), Pair(Pair(Symbol "begin", Pair(Symbol "a", Pair(Symbol "b", Nil))), Nil))))
 	(LambdaSimple (["a"; "b"; "c"], Seq [Var "a"; Var "b"]));;
+test_function (Pair(Symbol("lambda"), Pair(Nil, Pair(Number (Int 1), Nil)))) (LambdaSimple([], Const(Sexpr(Number(Int(1))))));;
+
 
 (*tests for let helpers*)
 (*extractVarsFromLet*)
@@ -309,6 +311,8 @@ test_sexprs_equal (extractSexprsFromLet (Pair((Pair(Symbol("x"), Number(Int 1)),
 
 (*applic tests*)
 test_function (Pair(Symbol("+"), Pair(Number(Int 1), Pair(Number(Int 2), Nil)))) (Applic(Var("+"), [Const(Sexpr(Number(Int(1)))); Const(Sexpr(Number(Int(2))))]));;
+test_function (Pair(Pair(Symbol("lambda"), Pair(Nil, Pair(Number (Int 1), Nil))), Nil)) (Applic(LambdaSimple([], Const(Sexpr(Number(Int(1))))), []));;
+
 
 (*let tests*)
 let letParsersToSexpr sexpr = 
@@ -326,6 +330,6 @@ test_sexprs_equal (letParsersToSexpr (Pair(Symbol("let"), Pair(Nil, Pair(Number 
 test_sexprs_equal (letParsersToSexpr (Pair(Symbol("let"), Pair(Pair(Symbol("x"), Pair(Number(Int 1), Nil)), Symbol("x"))))) (Pair(Pair(Symbol("lambda"), Pair(Pair(Symbol("x"), Nil), Symbol("x"))), Pair(Number(Int 1), Nil)));;
 
 (*real let tests*)
-(*test_function (Pair(Symbol("let"), Pair(Nil, Pair(Number (Int 1), Nil)))) (Applic(Nil, []));;*)
+test_function (Pair(Symbol("let"), Pair(Nil, Pair(Number (Int 1), Nil)))) (Applic(LambdaSimple([], Const(Sexpr(Number(Int(1))))), []));;
 
 end;; (* struct Tag_Parser *)
