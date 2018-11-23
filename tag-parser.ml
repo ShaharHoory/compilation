@@ -51,8 +51,6 @@ let rec expr_eq e1 e2 =
 
                        
 exception X_syntax_error;;
-exception X_list_error;;
-exception X_list_2_error;;
 
 module type TAG_PARSER = sig
   val tag_parse_expression : sexpr -> expr
@@ -60,6 +58,20 @@ module type TAG_PARSER = sig
 end;; (* signature TAG_PARSER *)
 
 module Tag_Parser : TAG_PARSER = struct
+
+(* ----------------------- Utilities function ----------------------------------- *)
+let disj nt1 nt2 =
+  fun s ->
+  try (nt1 s)
+  with X_syntax_error -> (nt2 s);;
+
+let nt_none _ = raise X_syntax_error;;
+  
+let disj_list nts = List.fold_right disj nts nt_none;;
+
+let rec map f lst = match lst with
+	| [] -> Nil
+	| head :: tail -> Pair(f head, map f tail);;
 
 let reserved_word_list =
   ["and"; "begin"; "cond"; "define"; "else";
@@ -80,8 +92,6 @@ let rec isProperList arglist =
 	|Pair (exp1, Pair(exp_1, exp_2)) -> isProperList (Pair(exp_1, exp_2))
 	|Nil->true
 	|_-> false ;;
-
-
 
 let sexprToString symbolSexpr = 
 	match symbolSexpr with
@@ -107,14 +117,20 @@ let rec uniq x =
 
 let isUniq x = List.length (uniq x) == List.length (x);;
 
-let disj nt1 nt2 =
-  fun s ->
-  try (nt1 s)
-  with X_syntax_error -> (nt2 s);;
+let rec quasiQuote_expander sexpr = 
+	match sexpr with 
+	| Pair(Symbol "unquote", Pair(s, Nil)) -> s
+	| Pair (Symbol "unquote-splicing", Pair(s,Nil)) -> raise X_syntax_error
+	| Nil-> Pair(Symbol "quote", Pair(Nil, Nil)) (*empty list? *)
+	| Symbol (s) -> Pair(Symbol "quote", Pair(Symbol(s), Nil))
+	| Vector (s_list) -> Pair(Symbol "Vector" ,(map quasiQuote_expander s_list))
 
-let nt_none _ = raise X_syntax_error;;
-  
-let disj_list nts = List.fold_right disj nts nt_none;;
+	| Pair(Pair (Symbol "unquote-splicing", Pair(a_1,Nil)), b) -> 
+		Pair(Symbol "append", Pair(a_1, Pair(quasiQuote_expander b, Nil)))
+	| Pair(a, Pair (Symbol "unquote-splicing", Pair(b_1,Nil))) -> 
+		Pair(Symbol "cons", Pair(quasiQuote_expander a, Pair(b_1,Nil)))
+	| Pair (a,b) -> Pair(Symbol "cons", Pair(quasiQuote_expander a, Pair(quasiQuote_expander b, Nil)))
+	| _ -> raise X_syntax_error
 
 
 (*let helpers*)
@@ -136,6 +152,10 @@ let rec extractSexprsFromLet sexpr = match sexpr with
 
 let rec tag_parse sexpr = 
 let parsers = (disj_list [constParsers; ifParsers;lambdaParser; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers]) in parsers sexpr 
+
+and quasiquoteParser sexpr = match sexpr with
+	|Pair(Symbol "quasiquote", Pair(s,Nil)) -> tag_parse (quasiQuote_expander s)
+	|_ -> raise X_syntax_error
 
 and constParsers sexpr = match sexpr with 
 	(*Pair(s, Nil) -> (tag_parse s) *)(*This is how we get rid of Nil - this treats the last item on proper lists*)
@@ -200,7 +220,7 @@ and explicitSeqParser sexpr = match sexpr with
 and explicitSeqHelper sexpr = match sexpr with 
 	| Pair(Symbol("begin"), Pair(car, Nil)) -> [tag_parse car]
 	| Pair(Symbol("begin"), Pair(car, cdr)) -> [tag_parse car] @ (explicitSeqHelper (Pair(Symbol("begin"), cdr)))
-	| _ -> raise X_list_error
+	| _ -> raise X_syntax_error
 
 and definitionParser sexpr = match sexpr with
 	| Pair(Symbol("define"), Pair(Symbol(name), Pair(s, Nil))) -> Def(tag_parse (Symbol(name)), tag_parse s)
@@ -532,4 +552,20 @@ _assert 21.2 "(cond (p1 e1 e2) (p2 e3 e4) (else e5 e6) (BAD BAD BAD))"
           (begin e5 e6)))");;
 
 *)
+(* `,x *)
+test_function (Pair(Symbol "quasiquote", Pair(Pair(Symbol "unquote", Pair(Symbol "x", Nil)), Nil))) (Var "x");;
+(* `() *)
+test_function (Pair(Symbol "quasiquote", Pair(Nil, Nil))) (Const(Sexpr(Nil)));;
+(* `#(a ,b c ,d)*)
+test_function (Pair(Symbol "quasiquote", Pair(Vector ([Symbol "a" ; Pair(Symbol "unquote", Pair(Symbol "b", Nil)) ; Symbol "c" ; Pair(Symbol "unquote", Pair(Symbol "d", Nil)) ;]), Nil)))
+(Applic(Var "Vector", [Const(Sexpr(Symbol "a")); Var "b"; Const(Sexpr(Symbol "c")); Var "d";]));;
+(* `(a b) *)
+test_function (Pair(Symbol "quasiquote", Pair(Pair(Symbol "a", Pair(Symbol "b", Nil)), Nil))) 
+	(Applic (Var "cons", [Const(Sexpr(Symbol "a")) ; Applic(Var "cons", [Const(Sexpr(Symbol "b")) ; Const(Sexpr(Nil))]) ]));;
+(* (,a ,@b) --> (cons a (append b '())) *)
+test_function (Pair(Symbol "quasiquote", Pair(Pair(Pair(Symbol "unquote", Pair(Symbol "a", Nil)), Pair(Pair(Symbol "unquote-splicing", Pair(Symbol "b", Nil)), Nil)), Nil)))
+(Applic (Var "cons", [Var "a" ; (Applic (Var "append", [Var "b" ; Const(Sexpr(Nil));])) ])) ;;
+
+
+
 end;; (* struct Tag_Parser *)
