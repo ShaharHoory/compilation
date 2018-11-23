@@ -288,8 +288,11 @@ let letParsersToSexpr sexpr =
 		(*| Pair(Symbol("let"), Pair(Pair(rib, ribs), Pair(body, Nil))) -> tag_parse (Pair(Pair(Symbol("lambda"), Pair(extractVarsFromLet (Pair(rib, ribs)), body)), extractSexprsFromLet (Pair(rib, ribs))))
 																											same comment for here too*)
 		| _ -> raise X_syntax_error;;
-
+(*sexpression equality in let*)
 test_sexprs_equal (letParsersToSexpr (Pair(Symbol("let"), Pair(Nil, Pair(Number (Int 1), Nil))))) (Pair(Pair(Symbol("lambda"), Pair(Nil, Pair(Number (Int 1), Nil))), Nil));;
 test_sexprs_equal (letParsersToSexpr (Pair(Symbol("let"), Pair(Pair(Symbol("x"), Pair(Number(Int 1), Nil)), Symbol("x"))))) (Pair(Pair(Symbol("lambda"), Pair(Pair(Symbol("x"), Nil), Symbol("x"))), Pair(Number(Int 1), Nil)));;
+
+(*real let tests*)
+(*test_function (Pair(Symbol("let"), Pair(Nil, Pair(Number (Int 1), Nil)))) (Applic(Nil, []));;*)
 
 end;; (* struct Tag_Parser *)
