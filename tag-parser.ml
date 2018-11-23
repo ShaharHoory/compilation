@@ -123,7 +123,7 @@ let rec quasiQuote_expander sexpr =
 	| Pair (Symbol "unquote-splicing", Pair(s,Nil)) -> raise X_syntax_error
 	| Nil-> Pair(Symbol "quote", Pair(Nil, Nil)) (*empty list? *)
 	| Symbol (s) -> Pair(Symbol "quote", Pair(Symbol(s), Nil))
-	| Vector (s_list) -> Pair(Symbol "Vector" ,(map quasiQuote_expander s_list))
+	| Vector (s_list) -> Pair(Symbol "vector" ,(map quasiQuote_expander s_list))
 
 	| Pair(Pair (Symbol "unquote-splicing", Pair(a_1,Nil)), b) -> 
 		Pair(Symbol "append", Pair(a_1, Pair(quasiQuote_expander b, Nil)))
@@ -151,7 +151,7 @@ let rec extractSexprsFromLet sexpr = match sexpr with
 	| _ -> raise X_syntax_error
 
 let rec tag_parse sexpr = 
-let parsers = (disj_list [constParsers; ifParsers; lambdaParser; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers; letStarParsers]) in parsers sexpr 
+let parsers = (disj_list [constParsers; ifParsers; lambdaParser; quasiquoteParser; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers; letStarParsers]) in parsers sexpr 
 
 and quasiquoteParser sexpr = match sexpr with
 	|Pair(Symbol "quasiquote", Pair(s,Nil)) -> tag_parse (quasiQuote_expander s)
@@ -270,7 +270,7 @@ let rec print_sexpr = fun sexprObj ->
     | String(e) -> Printf.sprintf "String(%s)" e
     | Symbol(e) -> Printf.sprintf "Symbol(%s)" e
     | Pair(e,s) -> Printf.sprintf "Pair(%s,%s)" (print_sexpr e) (print_sexpr s) 
-    | Vector(list)-> Printf.sprintf "Vector(%s)" (print_sexprs list)
+    | Vector(list)-> Printf.sprintf "vector(%s)" (print_sexprs list)
 
 and 
 
@@ -503,6 +503,21 @@ _assert 17.2 "(let* ((e1 v1)(e2 v2)(e3 v3)) body)"
   (Applic (LambdaSimple (["e1"], Applic (LambdaSimple (["e2"], Applic (LambdaSimple (["e3"], Var "body"),
    [Var "v3"])), [Var "v2"])), [Var "v1"]));;
 
+(*Quasiquote*)
+_assert 20.0 "`,x" (_tag_string "x");;
+_assertX 20.01 "`,@x";;
+_assert 20.02 "`(a b)" (_tag_string "(cons 'a (cons 'b '()))");;
+_assert 20.03 "`(,a b)" (_tag_string "(cons a (cons 'b '()))");;
+_assert 20.04 "`(a ,b)" (_tag_string "(cons 'a (cons b '()))");;
+_assert 20.05 "`(,@a b)" (_tag_string "(append a (cons 'b '()))");;
+_assert 20.06 "`(a ,@b)" (_tag_string "(cons 'a (append b '()))");;
+_assert 20.07 "`(,a ,@b)" (_tag_string "(cons a (append b '()))");;
+_assert 20.08 "`(,@a ,@b)" (_tag_string "(append a (append b '()))");;
+_assert 20.09 "`(,@a . ,b)" (_tag_string "(append a b)");;
+_assert 20.10 "`(,a . ,@b)" (_tag_string "(cons a b)");;
+_assert 20.11 "`(((,@a)))" (_tag_string "(cons (cons (append a '()) '()) '())");;
+_assert 20.12 "`#(a ,b c ,d)" (_tag_string "(vector 'a b 'c d)");;
+
 (*NOT YET IMPLEMENTED*)
 (*
 (*And*)
@@ -524,21 +539,6 @@ _assert 19.0 "(letrec ((f1 e1)(f2 e2)(f3 e3)) body)"
      "(let ((f1 'whatever)(f2 'whatever)(f3 'whatever))
 (set! f1 e1) (set! f2 e2) (set! f3 e3)
 (let () body))");;
-
-(*Quasiquote*)
-_assert 20.0 "`,x" (_tag_string "x");;
-_assertX 20.01 "`,@x";;
-_assert 20.02 "`(a b)" (_tag_string "(cons 'a (cons 'b '()))");;
-_assert 20.03 "`(,a b)" (_tag_string "(cons a (cons 'b '()))");;
-_assert 20.04 "`(a ,b)" (_tag_string "(cons 'a (cons b '()))");;
-_assert 20.05 "`(,@a b)" (_tag_string "(append a (cons 'b '()))");;
-_assert 20.06 "`(a ,@b)" (_tag_string "(cons 'a (append b '()))");;
-_assert 20.07 "`(,a ,@b)" (_tag_string "(cons a (append b '()))");;
-_assert 20.08 "`(,@a ,@b)" (_tag_string "(append a (append b '()))");;
-_assert 20.09 "`(,@a . ,b)" (_tag_string "(append a b)");;
-_assert 20.10 "`(,a . ,@b)" (_tag_string "(cons a b)");;
-_assert 20.11 "`(((,@a)))" (_tag_string "(cons (cons (append a '()) '()) '())");;
-_assert 20.12 "`#(a ,b c ,d)" (_tag_string "(vector 'a b 'c d)");;
 
 (*Cond*)
 _assert 21.0 "(cond (a => b)(c => d))"
@@ -574,7 +574,7 @@ test_function (Pair(Symbol "quasiquote", Pair(Pair(Symbol "unquote", Pair(Symbol
 test_function (Pair(Symbol "quasiquote", Pair(Nil, Nil))) (Const(Sexpr(Nil)));;
 (* `#(a ,b c ,d)*)
 test_function (Pair(Symbol "quasiquote", Pair(Vector ([Symbol "a" ; Pair(Symbol "unquote", Pair(Symbol "b", Nil)) ; Symbol "c" ; Pair(Symbol "unquote", Pair(Symbol "d", Nil)) ;]), Nil)))
-(Applic(Var "Vector", [Const(Sexpr(Symbol "a")); Var "b"; Const(Sexpr(Symbol "c")); Var "d";]));;
+(Applic(Var "vector", [Const(Sexpr(Symbol "a")); Var "b"; Const(Sexpr(Symbol "c")); Var "d";]));;
 (* `(a b) *)
 test_function (Pair(Symbol "quasiquote", Pair(Pair(Symbol "a", Pair(Symbol "b", Nil)), Nil))) 
 	(Applic (Var "cons", [Const(Sexpr(Symbol "a")) ; Applic(Var "cons", [Const(Sexpr(Symbol "b")) ; Const(Sexpr(Nil))]) ]));;
