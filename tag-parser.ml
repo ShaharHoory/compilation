@@ -162,8 +162,12 @@ let expand_and sexpr = match sexpr with
 	| Pair(Symbol("and"), Pair(sexpr1, rest)) -> Pair(Symbol("if"), Pair(sexpr1, Pair(Pair(Symbol("and"), rest), Pair(Bool(false), Nil))))
 	| _ -> raise X_syntax_error;;
 
+let expand_MITdefine sexpr = match sexpr with
+	| Pair(Symbol("define"), Pair(Pair(Symbol(var), arglist), Pair(sexps, Nil))) -> Pair(Symbol("define"), Pair(Symbol(var), Pair(Pair(Symbol("lambda"), Pair(arglist, sexps)), Nil)))
+	| _ -> raise X_syntax_error
+
 let rec tag_parse sexpr = 
-let parsers = (disj_list [constParsers; ifParsers; lambdaParser; quasiquoteParser; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers; letStarParsers; andParser]) in parsers sexpr 
+let parsers = (disj_list [constParsers; ifParsers; lambdaParser; quasiquoteParser; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers; letStarParsers; andParser; mitDefine]) in parsers sexpr 
 
 and quasiquoteParser sexpr = match sexpr with
 	|Pair(Symbol "quasiquote", Pair(s,Nil)) -> tag_parse (quasiQuote_expander s)
@@ -239,7 +243,11 @@ and explicitSeqHelper sexpr = match sexpr with
 
 and definitionParser sexpr = match sexpr with
 	| Pair(Symbol("define"), Pair(Symbol(name), Pair(s, Nil))) -> Def(tag_parse (Symbol(name)), tag_parse s)
-	| Pair(Symbol("define"), Pair(Symbol(name), s)) -> Def(tag_parse (Symbol(name)), tag_parse s)
+	(*| Pair(Symbol("define"), Pair(Symbol(name), s)) -> Def(tag_parse (Symbol(name)), tag_parse s) - i think this is ilegal - CHECK*)
+	| _ -> raise X_syntax_error
+
+and mitDefine sexpr = match sexpr with
+	| Pair(Symbol("define"), Pair(Pair(Symbol(var), arglist), Pair(sexps, Nil))) -> tag_parse (expand_MITdefine sexpr)
 	| _ -> raise X_syntax_error
 
 and setBangParser sexpr = match sexpr with
@@ -517,6 +525,12 @@ _assert 17.2 "(let* ((e1 v1)(e2 v2)(e3 v3)) body)"
   (Applic (LambdaSimple (["e1"], Applic (LambdaSimple (["e2"], Applic (LambdaSimple (["e3"], Var "body"),
    [Var "v3"])), [Var "v2"])), [Var "v1"]));;
 
+(*MIT define*)
+(*_assert 18.0 "(define (var . arglst) . (body))" (_tag_string "(define var (lambda arglst body))");;
+
+print_string (print_sexpr (read_sexpr "(define (var . arglst) . (body))"));;*)
+
+
 (*Quasiquote*)
 _assert 20.0 "`,x" (_tag_string "x");;
 _assertX 20.01 "`,@x";;
@@ -534,9 +548,6 @@ _assert 20.12 "`#(a ,b c ,d)" (_tag_string "(vector 'a b 'c d)");;
 
 (*NOT YET IMPLEMENTED*)
 (*
-
-(*MIT define*)
-_assert 18.0 "(define (var . arglst) . (body))" (_tag_string "(define var (lambda arglst body))");;
 
 
 (*Letrec*)
