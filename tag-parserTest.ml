@@ -265,10 +265,10 @@ let test_Applications = fun () ->
 let test_Disjunctions = fun () ->
     current_test := "test_Disjunctions";
     test 1 (expr_eq (execute_tag_parse_expression (Pair(Symbol "or", Nil))) (execute_expected(Const(Sexpr(Bool(false))))));
-    test 2 (expr_eq (execute_tag_parse_expression (Pair(Symbol "or", Pair(Symbol "hello", Nil)))) (execute_expected(Var "hello")));
+   (* test 2 (expr_eq (execute_tag_parse_expression (Pair(Symbol "or", Pair(Symbol "hello", Nil)))) (execute_expected(Var "hello")));
     test 3 (expr_eq (execute_tag_parse_expression (Pair(Symbol "or", Pair(Number(Int(3)), Nil)))) (execute_expected(Const(Sexpr(Number(Int(3)))))));
     test 4 (expr_eq (execute_tag_parse_expression (Pair(Symbol "or", Pair(Char '\t', Nil)))) (execute_expected(Const(Sexpr(Char '\t')))));
-    test 5 (expr_eq (execute_tag_parse_expression (Pair(Symbol "or", Pair(Pair(Symbol("quote"),Pair(Pair(Char('c'), Pair(Number(Float(37392.39382)), Pair(Number(Int(37392)), Pair(String("this"), Pair(Bool(true), Nil))))),Nil)), Nil)))) (execute_expected(Const(Sexpr(Pair(Char('c'), Pair(Number(Float(37392.39382)), Pair(Number(Int(37392)), Pair(String("this"), Pair(Bool(true), Nil))))))))));
+    *)test 5 (expr_eq (execute_tag_parse_expression (Pair(Symbol "or", Pair(Pair(Symbol("quote"),Pair(Pair(Char('c'), Pair(Number(Float(37392.39382)), Pair(Number(Int(37392)), Pair(String("this"), Pair(Bool(true), Nil))))),Nil)), Nil)))) (execute_expected(Const(Sexpr(Pair(Char('c'), Pair(Number(Float(37392.39382)), Pair(Number(Int(37392)), Pair(String("this"), Pair(Bool(true), Nil))))))))));
     test 6 (expr_eq (execute_tag_parse_expression (Pair(Symbol "or", Pair(Pair(Symbol "+", Pair(Number(Int 5), Pair(Number (Int 4), Nil))), Nil)))) (execute_expected(Applic(Var("+"),[Const(Sexpr(Number(Int 5))); Const(Sexpr(Number(Int 4)))]))));
     test 7 (expr_eq (execute_tag_parse_expression (Pair(Symbol "or", Pair(Symbol "hello", Pair(String "hello", Nil))))) (execute_expected(Or([Var("hello"); Const(Sexpr(String "hello"))]))));
     test 8 (expr_eq (execute_tag_parse_expression (Pair(Symbol "or", Pair(Number (Int 54), Pair(Char 'j', Pair(String "do it", Nil)))))) (execute_expected(Or([Const(Sexpr(Number (Int 54))); Const(Sexpr(Char 'j')); Const(Sexpr(String "do it"))]))));
