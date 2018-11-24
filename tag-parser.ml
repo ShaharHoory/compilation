@@ -203,9 +203,9 @@ and varParser sexpr = match sexpr with
 
 and orParser sexpr = match sexpr with
 	| Pair(Symbol("or"), Nil) -> Const(Sexpr(Bool(false)))
-	| Pair(Symbol("or"), Pair(oneArg, Nil)) -> tag_parse oneArg
+	| Pair(Symbol("or"), Pair(oneArg, Nil)) -> Or(orHelper sexpr)
 	| Pair(Symbol("or"), Pair (car, cdr)) -> Or(orHelper sexpr) 
-	| Pair(Symbol("or"), oneArg) -> tag_parse oneArg
+	(*| Pair(Symbol("or"), oneArg) -> tag_parse oneArg I Think this is ilegal - CHECK*)
 	| _ -> raise X_syntax_error
 
 and orHelper sexpr = match sexpr with 
@@ -323,7 +323,7 @@ test_function (Pair(Symbol("if"), Pair(Bool(true), Pair(String("a"), Nil))))
 				(If (Const(Sexpr(Bool(true))), Const(Sexpr(String("a"))), Const(Void)));;
 
 (*or test*)
-test_function (Pair(Symbol "or", Pair(Pair(Symbol "quote", Pair(Symbol "a", Nil)), Nil))) (Const (Sexpr (Symbol "a")));;
+test_function (Pair(Symbol "or", Pair(Pair(Symbol "quote", Pair(Symbol "a", Nil)), Nil))) (Or([(Const (Sexpr (Symbol "a")))]));;
 (*'(or #t #f 'a')*)
 test_function (Pair(Symbol "or", Pair(Bool true, Pair(Bool false, Pair(Pair(Symbol "quote", Pair(Char 'a', Nil)), Nil))))) 
 	((Or [Const (Sexpr (Bool true)); Const (Sexpr (Bool false)); Const (Sexpr (Char 'a'))]));;
@@ -480,8 +480,7 @@ _assert 12.0 "(or #t #f #\\a)"
      [Const (Sexpr (Bool true)); Const (Sexpr (Bool false));
       Const (Sexpr (Char 'a'))]);;
 
-_assert 12.1 "(or 'a)"
-      (Const (Sexpr (Symbol "a")));;
+_assert 12.1 "(or 'a)"  (Or [Const (Sexpr (Symbol "a"))]);;
 
 _assert 12.2 "(or)"
   (Const (Sexpr (Bool false)));;
@@ -537,7 +536,7 @@ _assert 20.12 "`#(a ,b c ,d)" (_tag_string "(vector 'a b 'c d)");;
 (*
 
 (*MIT define*)
-_assert 18.0 "(define (var . arglst) . (body))" (Def (Var "var", LambdaOpt ([],"arglst", Applic (Var "body", []))));;
+_assert 18.0 "(define (var . arglst) . (body))" (_tag_string "(define var (lambda arglst body))");;
 
 
 (*Letrec*)
@@ -548,14 +547,18 @@ _assert 19.0 "(letrec ((f1 e1)(f2 e2)(f3 e3)) body)"
 (let () body))");;
 
 (*Cond*)
-_assert 21.0 "(cond (a => b)(c => d))"
+__assert 21.0 "(cond (e1 => f1) (e2 => f2))"
   (_tag_string
-     "(let ((value a)(f (lambda () b)))
-        (if value
-          ((f) value)
-          (let ((value c)(f (lambda () d)))
-            (if value
-             ((f) value)))))");;
+     "
+(let
+((value e1)
+(f (lambda () f1))
+(rest (lambda ()
+ 
+(let ((value e2)(f (lambda () f2))) (if value ((f) value)))
+
+)))
+(if value ((f) value) (rest)))");;
 
 _assert 21.1 "(cond (p1 e1 e2) (p2 e3 e4) (p3 e4 e5))"
   (_tag_string
