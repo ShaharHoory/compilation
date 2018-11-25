@@ -128,7 +128,6 @@ let rec extractVarsFromLet sexpr = match sexpr with
 
 (*GOAL - RETURN THIS AS PROPER LIST*)
 (*Input: Pair(Pair(Symbol "s", Pair(Number (Int 4), Nil)), Pair(Pair(Symbol "y", Pair(String "s", Nil)), Nil)) *)
-(*Current ouptput: (Pair(Number(Int(4)),String(s))*)
 (*Expected output: Pair(Number(Int(4)), Pair(String(s), Nil)))*)
 let rec extractSexprsFromLet sexpr = match sexpr with
 	| Pair(Pair(Symbol(sym), Nil), ribs) -> raise X_syntax_error (*let (x) (body) with no assignment to x is illegal*)
@@ -159,6 +158,7 @@ let expand_letStar sexpr = match sexpr with
 	| Pair(Symbol("let*"), Pair(Pair(rib, Nil), body)) -> Pair(Symbol("let"), Pair(Pair(rib, Nil), body)) (*MAYBE should be Pair(body, NIL) ??? *)
 	| Pair(Symbol("let*"), Pair(Pair(rib, ribs), body)) -> Pair(Symbol("let"), Pair(Pair(rib, Nil), Pair(Pair(Symbol("let*"), Pair(ribs, body)), Nil)))
 	| _ -> raise X_syntax_error;;
+
 let rec condExpander sexpr = 
 	match sexpr with
 	| Pair(Pair(expr, Pair(Symbol "=>", expr_f)), Nil) -> 
@@ -191,8 +191,10 @@ let rec extractVarsFromLet sexpr = match sexpr with
 	| Pair(Pair(Symbol(sym), value), ribs) -> Pair(Symbol(sym), extractVarsFromLet ribs)
 	| _ -> raise X_syntax_error
 
+	 (* Pair(Symbol "define", Pair(Pair(Symbol "func", Nil), Pair(Symbol "x", Nil)))  *)
 let expand_MITdefine sexpr = match sexpr with
-	| Pair(Symbol("define"), Pair(Pair(Symbol(var), arglist), Pair(sexps, Nil))) -> Pair(Symbol("define"), Pair(Symbol(var), Pair(Pair(Symbol("lambda"), Pair(arglist, sexps)), Nil)))
+	| Pair(Symbol("define"), Pair(Pair(Symbol(var), arglist), Pair(Pair(body1, body2), Nil))) -> Pair(Symbol("define"), Pair(Symbol(var), Pair(Pair(Symbol("lambda"), Pair(arglist, Pair(body1, body2))), Nil)))
+	| Pair(Symbol("define"), Pair(Pair(Symbol(var), arglist), Pair(onesexp, Nil))) -> Pair(Symbol("define"), Pair(Symbol(var), Pair(Pair(Symbol("lambda"), Pair(arglist, Pair(onesexp, Nil))), Nil)))
 	| _ -> raise X_syntax_error
 
 (* --------------------------------------tag parser -----------------------------------------------------------------  *)	
@@ -227,9 +229,10 @@ and ifParsers sexpr = match sexpr with
 and lambdaParser sexpr = match sexpr with
 	| Pair(Symbol "lambda", Pair(arguments, body)) when body <> Nil-> 
 		let arglist = (makeStringList arguments) in
-if ((isUniq arglist) && (isProperList arguments) && (andmap is_not_reserved_word arglist)) 
-			then LambdaSimple(arglist, tag_parse(Pair(Symbol("begin"),body))) 
-		else raise X_syntax_error
+			if ((isUniq arglist) && (isProperList arguments) && (andmap is_not_reserved_word arglist)) 
+			then LambdaSimple(arglist, tag_parse(Pair(Symbol("begin"),body))) (*when the body is one arg, and not Pair(a, nil)) 
+														this is a problem because ther's not (begin, something) without proper*)
+			else raise X_syntax_error
 	| _ -> raise X_syntax_error
 
 and varParser sexpr = match sexpr with
@@ -333,6 +336,9 @@ print_sexprs = fun sexprList ->
 let print_sexprs_as_list = fun sexprList ->
   let sexprsString = print_sexprs sexprList in
     "[ " ^ sexprsString ^ " ]";;
+
+
+print_string (print_sexpr (expand_MITdefine (Pair(Symbol "define", Pair(Pair(Symbol "func", Nil), Pair(Symbol "x", Nil))))));;
 
 (*OUR TESTS*)
 let test_function sexpr expected_expr = 
