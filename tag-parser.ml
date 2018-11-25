@@ -159,6 +159,21 @@ let expand_letStar sexpr = match sexpr with
 	| Pair(Symbol("let*"), Pair(Pair(rib, Nil), body)) -> Pair(Symbol("let"), Pair(Pair(rib, Nil), body)) (*MAYBE should be Pair(body, NIL) ??? *)
 	| Pair(Symbol("let*"), Pair(Pair(rib, ribs), body)) -> Pair(Symbol("let"), Pair(Pair(rib, Nil), Pair(Pair(Symbol("let*"), Pair(ribs, body)), Nil)))
 	| _ -> raise X_syntax_error;;
+let rec condExpander sexpr = 
+	match sexpr with
+	| Pair(Pair(expr, Pair(Symbol "=>", expr_f)), Nil) -> 
+		Pair(Symbol "let", Pair(Pair(Pair(Symbol "value", Pair(expr, Nil)), Pair(Pair(Symbol "f", Pair(Pair(Symbol "lambda", Pair(Nil, Pair(expr_f, Nil))), Nil)), Pair(Pair(Symbol "if", Pair(Symbol "value", Pair(Pair(Pair(Symbol "f", Nil), Pair(Symbol "value", Nil)), Nil))), Nil))), Nil))
+	| Pair(Pair(expr, Pair(Symbol "=>", expr_f)), rest) -> 
+		(* let (value = expr, f = lambda() expr_f) ==> if value ((f) value) else -> rest *)
+		Pair(Symbol "let", Pair(Pair(Pair(Symbol "value", Pair(expr, Nil)), Pair(Pair(Symbol "f", Pair(Pair(Symbol "lambda", Pair(Nil, Pair(expr_f, Nil))), Nil)), Pair(Pair(Symbol "rest", Pair(Pair(Symbol "lambda", Pair(Nil, Pair((condExpander rest), Nil))), Nil)), Nil))), Pair(Pair(Symbol "if", Pair(Symbol "value", Pair(Pair(Pair(Symbol "f", Nil), Pair(Symbol "value", Nil)), Pair(Pair(Symbol "rest", Nil), Nil)))), Nil)))
+	| Pair(Pair(Symbol "else", expr_n),rest) -> 
+		(* begin else *)
+		Pair(Symbol "begin", expr_n) (*was before: (Symbol "begin", Pair(expr_n,Nil) , also for 2 lines below*)
+	| Pair(Pair(expr, expr_n), rest) -> 
+		(* if expr then begin expr_n else --> rest *)
+		Pair(Symbol "if", Pair(expr, Pair(Pair(Symbol "begin", expr_n), Pair((condExpander rest), Nil))))
+	| Nil -> Nil
+	| _ -> raise X_not_yet_implemented
 
 let expand_and sexpr = match sexpr with
 	| Pair(Symbol("and"), Nil) -> Bool(true)
@@ -166,15 +181,31 @@ let expand_and sexpr = match sexpr with
 	| Pair(Symbol("and"), Pair(sexpr1, rest)) -> Pair(Symbol("if"), Pair(sexpr1, Pair(Pair(Symbol("and"), rest), Pair(Bool(false), Nil))))
 	| _ -> raise X_syntax_error;;
 
+
+(*let helpers*)
+let rec extractVarsFromLet sexpr = match sexpr with
+	| Pair(Pair(Symbol(sym), Nil), ribs) -> raise X_syntax_error (*let (x) (body) with no assignment to x is illegal*)
+	| Pair(Symbol(sym), Nil) -> raise X_syntax_error (*same reason*)
+	| Pair(Pair(Symbol(sym), value), Nil) -> Pair(Symbol(sym), Nil)
+	| Pair(Symbol(sym), value) -> Pair(Symbol(sym), Nil) (*improper list case of the above case*)
+	| Pair(Pair(Symbol(sym), value), ribs) -> Pair(Symbol(sym), extractVarsFromLet ribs)
+	| _ -> raise X_syntax_error
+
 let expand_MITdefine sexpr = match sexpr with
 	| Pair(Symbol("define"), Pair(Pair(Symbol(var), arglist), Pair(sexps, Nil))) -> Pair(Symbol("define"), Pair(Symbol(var), Pair(Pair(Symbol("lambda"), Pair(arglist, sexps)), Nil)))
 	| _ -> raise X_syntax_error
 
+(* --------------------------------------tag parser -----------------------------------------------------------------  *)	
+
 let rec tag_parse sexpr = 
-let parsers = (disj_list [constParsers; ifParsers; lambdaParser; quasiquoteParser; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers; letStarParsers; andParser; mitDefine]) in parsers sexpr 
+let parsers = (disj_list [constParsers; ifParsers;lambdaParser; condParser ; quasiquoteParser; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers]) in parsers sexpr 
 
 and quasiquoteParser sexpr = match sexpr with
 	|Pair(Symbol "quasiquote", Pair(s,Nil)) -> tag_parse (quasiQuote_expander s)
+	|_ -> raise X_syntax_error
+
+and condParser sexpr = match sexpr with
+	|Pair(Symbol "cond",ribs) -> tag_parse (condExpander ribs)
 	|_ -> raise X_syntax_error
 
 and constParsers sexpr = match sexpr with 
@@ -542,47 +573,7 @@ _assert 20.10 "`(,a . ,@b)" (_tag_string "(cons a b)");;
 _assert 20.11 "`(((,@a)))" (_tag_string "(cons (cons (append a '()) '()) '())");;
 _assert 20.12 "`#(a ,b c ,d)" (_tag_string "(vector 'a b 'c d)");;
 
-(*NOT YET IMPLEMENTED*)
-(*
 
-
-(*Letrec*)
-_assert 19.0 "(letrec ((f1 e1)(f2 e2)(f3 e3)) body)"
-  (_tag_string
-     "(let ((f1 'whatever)(f2 'whatever)(f3 'whatever))
-(set! f1 e1) (set! f2 e2) (set! f3 e3)
-(let () body))");;
-
-(*Cond*)
-__assert 21.0 "(cond (e1 => f1) (e2 => f2))"
-  (_tag_string
-     "
-(let
-((value e1)
-(f (lambda () f1))
-(rest (lambda ()
- 
-(let ((value e2)(f (lambda () f2))) (if value ((f) value)))
-
-)))
-(if value ((f) value) (rest)))");;
-
-_assert 21.1 "(cond (p1 e1 e2) (p2 e3 e4) (p3 e4 e5))"
-  (_tag_string
-     "(if p1
-        (begin e1 e2)
-        (if p2
-          (begin e3 e4)
-          (if p3
-            (begin e4 e5))))");;
-
-_assert 21.2 "(cond (p1 e1 e2) (p2 e3 e4) (else e5 e6) (BAD BAD BAD))"
-  (_tag_string
-     "(if p1
-        (begin e1 e2)
-        (if p2
-          (begin e3 e4)
-          (begin e5 e6)))");;
 
 *)
 (* `,x *)
@@ -600,5 +591,6 @@ test_function (Pair(Symbol "quasiquote", Pair(Pair(Pair(Symbol "unquote", Pair(S
 (Applic (Var "cons", [Var "a" ; (Applic (Var "append", [Var "b" ; Const(Sexpr(Nil));])) ])) ;;
 
 
-
 end;; (* struct Tag_Parser *)
+
+
