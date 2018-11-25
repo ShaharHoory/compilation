@@ -8,6 +8,9 @@
 open PC
 open Reader
 
+(*DELETE ME******************************************************************************************************)
+let () = Printexc.record_backtrace true;;
+(*DELETE ME******************************************************************************************************)
 type constant =
   | Sexpr of sexpr
   | Void
@@ -191,7 +194,6 @@ let rec extractVarsFromLet sexpr = match sexpr with
 	| Pair(Pair(Symbol(sym), value), ribs) -> Pair(Symbol(sym), extractVarsFromLet ribs)
 	| _ -> raise X_syntax_error
 
-	 (* Pair(Symbol "define", Pair(Pair(Symbol "func", Nil), Pair(Symbol "x", Nil)))  *)
 let expand_MITdefine sexpr = match sexpr with
 	| Pair(Symbol("define"), Pair(Pair(Symbol(var), arglist), Pair(Pair(body1, body2), Nil))) -> Pair(Symbol("define"), Pair(Symbol(var), Pair(Pair(Symbol("lambda"), Pair(arglist, Pair(body1, body2))), Nil)))
 	| Pair(Symbol("define"), Pair(Pair(Symbol(var), arglist), Pair(onesexp, Nil))) -> Pair(Symbol("define"), Pair(Symbol(var), Pair(Pair(Symbol("lambda"), Pair(arglist, Pair(onesexp, Nil))), Nil)))
@@ -230,8 +232,7 @@ and lambdaParser sexpr = match sexpr with
 	| Pair(Symbol "lambda", Pair(arguments, body)) when body <> Nil-> 
 		let arglist = (makeStringList arguments) in
 			if ((isUniq arglist) && (isProperList arguments) && (andmap is_not_reserved_word arglist)) 
-			then LambdaSimple(arglist, tag_parse(Pair(Symbol("begin"),body))) (*when the body is one arg, and not Pair(a, nil)) 
-														this is a problem because ther's not (begin, something) without proper*)
+			then LambdaSimple(arglist, tag_parse(Pair(Symbol("begin"),body)))
 			else raise X_syntax_error
 	| _ -> raise X_syntax_error
 
@@ -269,6 +270,7 @@ and explicitSeqParser sexpr = match sexpr with
 	| Pair(Symbol("begin"), Nil) -> Const(Void)
 	| Pair(Symbol("begin"), Pair(car, Nil)) -> tag_parse car
 	| Pair(Symbol("begin"), Pair(car, cdr)) -> Seq(explicitSeqHelper sexpr)
+	(*TODO: check if we can get begin with one sexprs in improper list: pair(begin, sexp) and add this if needed!*)
 	| _ -> raise X_syntax_error
 
 and explicitSeqHelper sexpr = match sexpr with 
@@ -281,7 +283,7 @@ and definitionParser sexpr = match sexpr with
 	(*| Pair(Symbol("define"), Pair(Symbol(name), s)) -> Def(tag_parse (Symbol(name)), tag_parse s) - i think this is ilegal - CHECK*)
 	| _ -> raise X_syntax_error
 
-and mitDefine sexpr = match sexpr with
+and mitDefine sexpr = match sexpr with (*TODO: check that symbol(var) is Var (send to varParser)*)
 	| Pair(Symbol("define"), Pair(Pair(Symbol(var), arglist), Pair(sexps, Nil))) -> tag_parse (expand_MITdefine sexpr)
 	| _ -> raise X_syntax_error
 
@@ -336,9 +338,6 @@ print_sexprs = fun sexprList ->
 let print_sexprs_as_list = fun sexprList ->
   let sexprsString = print_sexprs sexprList in
     "[ " ^ sexprsString ^ " ]";;
-
-
-print_string (print_sexpr (expand_MITdefine (Pair(Symbol "define", Pair(Pair(Symbol "func", Nil), Pair(Symbol "x", Nil))))));;
 
 (*OUR TESTS*)
 let test_function sexpr expected_expr = 
@@ -538,9 +537,9 @@ _assert 14.0 "(set! a 5)" (Set (Var "a", Const (Sexpr (Number (Int 5)))));;
 _assertX 14.1 "(set! define 5)";;
 _assertX 14.2 "(set! \"string\" 5)";;
 
-(*Let   																	   CHECK THIS TESTS!!!!! *)
-(*_assert 15.0 "(let ((v1 b1)(v2 b2)) c1 c2 c3)"
-  (Applic (LambdaSimple (["v1"; "v2"], Seq [Var "c1"; Var "c2"; Var "c3"]), [Var "b1"; Var "b2"]));;*)
+(*Let*)
+_assert 15.0 "(let ((v1 b1)(v2 b2)) c1 c2 c3)"
+  (Applic (LambdaSimple (["v1"; "v2"], Seq [Var "c1"; Var "c2"; Var "c3"]), [Var "b1"; Var "b2"]));;
 _assert 15.1 "(let () c1 c2)" (Applic (LambdaSimple ([], Seq [Var "c1"; Var "c2"]), []));;
 
 (*And*)
@@ -554,18 +553,17 @@ _assert 16.2 "(and e1 e2 e3 e4)"
 
 (*Let* *)
 _assert 17.0 "(let* () body)" (Applic (LambdaSimple ([], Var "body"), []));;
-(*_assert 17.1 "(let* ((e1 v1)) body)" (Applic (LambdaSimple (["e1"], Var "body"), [Var "v1"]));;
+_assert 17.1 "(let* ((e1 v1)) body)" (Applic (LambdaSimple (["e1"], Var "body"), [Var "v1"]));;
 _assert 17.2 "(let* ((e1 v1)(e2 v2)(e3 v3)) body)"
   (Applic (LambdaSimple (["e1"], Applic (LambdaSimple (["e2"], Applic (LambdaSimple (["e3"], Var "body"),
-   [Var "v3"])), [Var "v2"])), [Var "v1"]));;*)
+   [Var "v3"])), [Var "v2"])), [Var "v1"]));;
 
 (*MIT define*)
-(*_assert 18.0 "(define (var . arglst) . (body))" (_tag_string "(define var (lambda arglst body))");;
+(*_assert 18.0 "(define (var . arglst) . (body))" (_tag_string "(define var (lambda arglst body))");;*)
 
-print_string (print_sexpr (read_sexpr "(define (var . arglst) . (body))"));;*)
 
 (*Quasiquote*)
-(*_assert 20.0 "`,x" (_tag_string "x");;
+_assert 20.0 "`,x" (_tag_string "x");;
 _assertX 20.01 "`,@x";;
 _assert 20.02 "`(a b)" (_tag_string "(cons 'a (cons 'b '()))");;
 _assert 20.03 "`(,a b)" (_tag_string "(cons a (cons 'b '()))");;
@@ -578,7 +576,7 @@ _assert 20.09 "`(,@a . ,b)" (_tag_string "(append a b)");;
 _assert 20.10 "`(,a . ,@b)" (_tag_string "(cons a b)");;
 _assert 20.11 "`(((,@a)))" (_tag_string "(cons (cons (append a '()) '()) '())");;
 _assert 20.12 "`#(a ,b c ,d)" (_tag_string "(vector 'a b 'c d)");;
-*)
+
 
 
 
