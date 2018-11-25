@@ -210,7 +210,7 @@ let test_Lambda_Expressions = fun () ->
     test 5 (expr_eq (execute_tag_parse_expression (Pair(Symbol "lambda", Pair(Pair(Symbol "a", Pair(Symbol "b", Nil)), Pair(Pair(Symbol "if", Pair(Number (Int 5), Pair(Number (Int 4), Pair(Number (Int 3), Nil)))), Pair(Pair(Symbol "quote", Pair(String "s", Nil)), Nil)))))) (execute_expected(LambdaSimple(["a"; "b"],Seq([If(Const(Sexpr(Number(Int 5))),Const(Sexpr(Number(Int 4))),Const(Sexpr(Number(Int 3)))); Const(Sexpr(String "s"))])))));
     test 6 (expr_eq (execute_tag_parse_expression (Pair(Symbol "lambda", Pair(Pair(Symbol "a", Pair(Symbol "b", Pair(Symbol "c", Nil))), Pair(Pair(Symbol "if", Pair(Number (Int 5), Pair(Number (Int 4), Pair(Number (Int 3), Nil)))), Pair(Pair(Symbol "quote", Pair(String "s", Nil)), Pair(Symbol "g", Nil))))))) (execute_expected(LambdaSimple(["a"; "b"; "c"],Seq([If(Const(Sexpr(Number(Int 5))),Const(Sexpr(Number(Int 4))),Const(Sexpr(Number(Int 3)))); Const(Sexpr(String "s")); Var("g")])))));
     
-   (* LAMBDA OPT TESTS
+   (* LAMBDA OPT TESTS*)
     test 7 (expr_eq (execute_tag_parse_expression (Pair(Symbol "lambda", Pair(Pair(Symbol "a", Symbol "b"), Pair(Symbol "x", Nil))))) (execute_expected(LambdaOpt(["a"],"b",Var("x")))));
     test 8 (expr_eq (execute_tag_parse_expression (Pair(Symbol "lambda", Pair(Pair(Symbol "a", Pair(Symbol "b", Symbol "c")), Pair(Symbol "x", Nil))))) (execute_expected(LambdaOpt(["a"; "b"],"c",Var("x")))));
     test 9 (expr_eq (execute_tag_parse_expression (Pair(Symbol "lambda", Pair(Pair(Symbol "a", Pair(Symbol "b", Pair(Symbol "c",Symbol "d"))), Pair(Pair(Symbol "if", Pair(Number (Int 5), Pair(Number (Int 4), Pair(Number (Int 3), Nil)))), Nil))))) (execute_expected(LambdaOpt(["a"; "b"; "c"],"d",If(Const(Sexpr(Number(Int 5))),Const(Sexpr(Number(Int 4))),Const(Sexpr(Number(Int 3))))))));
@@ -222,7 +222,7 @@ let test_Lambda_Expressions = fun () ->
     test 14 (expr_eq (execute_tag_parse_expression (Pair(Symbol "lambda", Pair(Symbol("f"), Pair(Pair(Symbol "if", Pair(Number (Int 5), Pair(Number (Int 4), Pair(Number (Int 3), Nil)))), Nil))))) (execute_expected(LambdaOpt([],"f",If(Const(Sexpr(Number(Int 5))),Const(Sexpr(Number(Int 4))),Const(Sexpr(Number(Int 3))))))));
     test 15 (expr_eq (execute_tag_parse_expression (Pair(Symbol "lambda", Pair(Symbol("5g3dc"), Pair(Pair(Symbol "if", Pair(Number (Int 5), Pair(Number (Int 4), Pair(Number (Int 3), Nil)))), Pair(Pair(Symbol "quote", Pair(String "s", Nil)), Nil)))))) (execute_expected(LambdaOpt([],"5g3dc",Seq([If(Const(Sexpr(Number(Int 5))),Const(Sexpr(Number(Int 4))),Const(Sexpr(Number(Int 3)))); Const(Sexpr(String "s"))])))));
     test 16 (expr_eq (execute_tag_parse_expression (Pair(Symbol "lambda", Pair(Symbol("!$^*-_=+<>?/:0123456789abcdefghijk"), Pair(Pair(Symbol "if", Pair(Number (Int 5), Pair(Number (Int 4), Pair(Number (Int 3), Nil)))), Pair(Pair(Symbol "quote", Pair(String "s", Nil)), Pair(Symbol "g", Nil))))))) (execute_expected(LambdaOpt([],"!$^*-_=+<>?/:0123456789abcdefghijk",Seq([If(Const(Sexpr(Number(Int 5))),Const(Sexpr(Number(Int 4))),Const(Sexpr(Number(Int 3)))); Const(Sexpr(String "s")); Var("g")])))));
-  *)
+  
     test 17 (expr_eq (execute_tag_parse_expression (Pair(Symbol "lambda", Pair(Pair(Symbol "a", Nil), Nil)))) (execute_expected(Var("test failed with X_syntax_error"))));
     test 18 (expr_eq (execute_tag_parse_expression (Pair(Symbol "lambda", Pair(Pair(Symbol "a", Nil), String("f"))))) (execute_expected(Var("test failed with X_syntax_error"))));
     test 19 (expr_eq (execute_tag_parse_expression (Pair(Symbol "lambda", Pair(Pair(Symbol "a", Pair(Symbol "b", Pair(Symbol "c", Pair(Symbol "d", Pair(Symbol "e", Pair(Symbol "f", Pair(Symbol "a", Nil))))))), Pair(Symbol "x", Nil))))) (execute_expected(Var("test failed with X_syntax_error"))));
@@ -556,6 +556,8 @@ let test_Tag_Parse_Expressions = fun () ->
     
 let tests = test_Self_Evaluated :: test_Variable :: test_Conditionals :: test_Lambda_Expressions :: test_Applications :: test_Disjunctions :: test_Definitions :: test_Assignments :: test_Sequences :: test_Quasiquoted_Macro_Expansion (*:: test_Cond_Macro_Expansion*) :: test_Let_Macro_Expansion :: test_Let_Star_Macro_Expansion (*:: test_Let_Rec_Macro_Expansion*) :: test_And_Macro_Expansion :: (*test_Tag_Parse_Expressions ::*) [];;
 
+(*let tests =  test_Quasiquoted_Macro_Expansion  :: [];;
+*)
 let rec start_tests = fun tests ->
     let print_info = fun exn stackTrace -> 
       Printf.printf "%s%s Failed with %s Exception\nStack Trace As Follows: %sLast got from test: %s\nLast expected from test: %s%s\n" red !current_test (Printexc.to_string exn) stackTrace !got !expected reset in

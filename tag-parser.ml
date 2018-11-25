@@ -86,24 +86,34 @@ let is_not_reserved_word word =
 	andmap (pred word) reserved_word_list;;
 
 
-let rec isProperList arglist = 
-	match arglist with
-	|Pair (exp1, Nil)-> true
-	|Pair (exp1, Pair(exp_1, exp_2)) -> isProperList (Pair(exp_1, exp_2))
-	|Nil->true
-	|_-> false ;;
-
 let sexprToString symbolSexpr = 
 	match symbolSexpr with
 	|Symbol (s) -> s
 	|_-> raise X_syntax_error;;
 
+(*checks if the list is proper or improper and return the last element - when the list is improper *)
+let rec isProperList_LastElement arglist = 
+	match arglist with
+	|Pair (exp1, Nil)-> ""
+	|Pair (exp1, Pair(exp_1, exp_2)) -> isProperList_LastElement (Pair(exp_1, exp_2))
+	|Pair (exp1, expr2) -> sexprToString expr2
+	|Nil->""
+	| _ -> raise X_no_match;;
+
 let rec makeStringList arglist = 
 	match arglist with
 	|Pair (exp1, Nil) -> (sexprToString exp1) :: []
-	|Pair (exp1, exp2) -> [sexprToString exp1] @ (makeStringList exp2)
-	| Nil -> []
-	|_-> raise X_syntax_error;;
+	|Pair (exp1, Pair(exp2, exp3)) -> [sexprToString exp1] @ (makeStringList (Pair(exp2, exp3)))
+	|Pair (exp1, exp2) -> [sexprToString exp1; sexprToString exp2]
+	|Nil -> []
+	| _-> raise X_syntax_error;;
+
+(*return the n mandatory elements *)
+let rec mandatoryArgs arglist = 
+	match arglist with
+	|Pair (exp1, Nil) -> (sexprToString exp1) :: []
+	|Pair (exp1, exp2) -> [sexprToString exp1] @ (mandatoryArgs exp2)
+	|_ -> []
 
 (*return array with uniq elements only*)
 let rec uniq x =
@@ -151,7 +161,8 @@ let rec quasiQuote_expander sexpr =
 	| Pair(a, Pair (Symbol "unquote-splicing", Pair(b_1,Nil))) -> 
 		Pair(Symbol "cons", Pair(quasiQuote_expander a, Pair(b_1,Nil)))
 	| Pair (a,b) -> Pair(Symbol "cons", Pair(quasiQuote_expander a, Pair(quasiQuote_expander b, Nil)))
-	| _ -> raise X_syntax_error;;
+	| _ -> sexpr;;
+ 
 
 let expand_letStar sexpr = match sexpr with
  	| Pair(Symbol("let*"), Pair(ribs, Nil)) -> raise X_syntax_error (* let* without body is invalid*)
@@ -224,12 +235,21 @@ and ifParsers sexpr = match sexpr with
 	(*| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, e_else))) -> If((tag_parse e_cond), (tag_parse e_then), (tag_parse e_else)) *)
 	| _ -> raise X_syntax_error
 
+(*tag_parse (Pair(Symbol "lambda", Pair(Pair(Symbol "a", Symbol "b"), Pair(Symbol "x", Nil))));;
+*)
+
 and lambdaParser sexpr = match sexpr with
+	| Pair (Symbol "lambda", Pair (Symbol(vs), body)) -> 
+		LambdaOpt ([], vs, tag_parse(Pair(Symbol("begin"),body)))
 	| Pair(Symbol "lambda", Pair(arguments, body)) when body <> Nil-> 
 		let arglist = (makeStringList arguments) in
-if ((isUniq arglist) && (isProperList arguments) && (andmap is_not_reserved_word arglist)) 
-			then LambdaSimple(arglist, tag_parse(Pair(Symbol("begin"),body))) 
-		else raise X_syntax_error
+		let lastElement = isProperList_LastElement arguments in 
+		let isProper = (compare lastElement "") == 0 in
+			if ((isUniq arglist) && isProper && (andmap is_not_reserved_word arglist)) 
+				then LambdaSimple(arglist, tag_parse(Pair(Symbol("begin"),body)))
+			else if ((isUniq arglist) && (andmap is_not_reserved_word arglist)) 
+				then LambdaOpt((mandatoryArgs arguments), lastElement, tag_parse(Pair(Symbol("begin"),body)))
+			else raise X_syntax_error
 	| _ -> raise X_syntax_error
 
 and varParser sexpr = match sexpr with
@@ -344,7 +364,7 @@ let test_sexprs_equal sexpr expected_sexpr =
 	if check = false then print_string("problem with sexpr "^(print_sexpr sexpr)^"\n");;
 
 (*test const*)
-test_function (Bool(true)) (Const(Sexpr(Bool(true))));;
+(*test_function (Bool(true)) (Const(Sexpr(Bool(true))));;
 test_function (Number(Int(3))) (Const(Sexpr(Number(Int(3)))));;
 test_function (Number(Float(-3.0))) (Const(Sexpr(Number(Float(-3.0)))));;
 test_function (Char('a')) (Const(Sexpr(Char('a'))));;
@@ -361,23 +381,24 @@ test_function (Pair(Symbol("if"), Pair(Bool(true), Pair(String("a"), Nil))))
 (*'(or #t #f 'a')*)
 test_function (Pair(Symbol "or", Pair(Bool true, Pair(Bool false, Pair(Pair(Symbol "quote", Pair(Char 'a', Nil)), Nil))))) 
 	((Or [Const (Sexpr (Bool true)); Const (Sexpr (Bool false)); Const (Sexpr (Char 'a'))]));;
+*)
 (*lambda simple tetsts*)
 (* (lambda (x) 4) *)
-test_function (Pair(Symbol "lambda", Pair(Pair(Symbol "x", Nil), Pair(Number(Int 4), Nil)))) (LambdaSimple(["x"], Const(Sexpr(Number(Int(4))))));;
+(*test_function (Pair(Symbol "lambda", Pair(Pair(Symbol "x", Nil), Pair(Number(Int 4), Nil)))) (LambdaSimple(["x"], Const(Sexpr(Number(Int(4))))));;
 test_function (Pair(Symbol "lambda", Pair(Nil, Pair(Number (Int 4), Nil)))) (LambdaSimple([], Const(Sexpr(Number(Int(4))))));;
 test_function (Pair(Symbol "lambda", Pair(Nil, Pair(Symbol "e", Pair(Symbol "f", Nil))))) (LambdaSimple( [], Seq [Var "e"; Var "f"])) ;;
 test_function (Pair(Symbol "lambda", Pair(Pair(Symbol "a", Pair(Symbol "b", Pair(Symbol "c", Nil))), Pair(Pair(Symbol "begin", Pair(Symbol "a", Pair(Symbol "b", Nil))), Nil))))
 	(LambdaSimple (["a"; "b"; "c"], Seq [Var "a"; Var "b"]));;
 test_function (Pair(Symbol("lambda"), Pair(Nil, Pair(Number (Int 1), Nil)))) (LambdaSimple([], Const(Sexpr(Number(Int(1))))));;
-
+*)
 
 (*tests for let helpers*)
 (*extractVarsFromLet*)
-test_sexprs_equal (extractVarsFromLet (Pair(Symbol("x"), Pair(Number(Int 1), Nil)))) (Pair(Symbol("x"), Nil));;
+(*test_sexprs_equal (extractVarsFromLet (Pair(Symbol("x"), Pair(Number(Int 1), Nil)))) (Pair(Symbol("x"), Nil));;
 test_sexprs_equal (extractVarsFromLet (Pair((Pair(Symbol("x"), Number(Int 1)), Pair(Symbol("y"), Pair(Number(Int(2)), Nil)))))) (Pair(Symbol("x"), Pair(Symbol("y"), Nil)));;
 (*improper case*)
 test_sexprs_equal (extractVarsFromLet (Pair((Pair(Symbol("x"), Number(Int 1)), Pair(Symbol("y"), Number(Int(2))))))) (Pair(Symbol("x"), Pair(Symbol("y"), Nil)));;
-
+*)
 (*extractSexprsFromLet*)
 (*test_sexprs_equal (extractSexprsFromLet (Pair(Symbol("x"), Pair(Number(Int 1), Nil)))) (Pair(Number(Int(1)), Nil));;
 test_sexprs_equal (extractSexprsFromLet (Pair((Pair(Symbol("x"), Number(Int 1)), Pair(Symbol("y"), Pair(Number(Int(2)), Nil)))))) (Pair(Number(Int(1)), Pair(Number(Int(2)), Nil)));;
@@ -387,9 +408,9 @@ test_sexprs_equal (extractSexprsFromLet (Pair((Pair(Symbol("x"), Number(Int 1)),
 *)
 
 (*applic tests*)
-test_function (Pair(Symbol("+"), Pair(Number(Int 1), Pair(Number(Int 2), Nil)))) (Applic(Var("+"), [Const(Sexpr(Number(Int(1)))); Const(Sexpr(Number(Int(2))))]));;
+(*test_function (Pair(Symbol("+"), Pair(Number(Int 1), Pair(Number(Int 2), Nil)))) (Applic(Var("+"), [Const(Sexpr(Number(Int(1)))); Const(Sexpr(Number(Int(2))))]));;
 test_function (Pair(Pair(Symbol("lambda"), Pair(Nil, Pair(Number (Int 1), Nil))), Nil)) (Applic(LambdaSimple([], Const(Sexpr(Number(Int(1))))), []));;
-
+*)
 
 (*let tests*)
 let letParsersToSexpr sexpr = 
@@ -454,7 +475,7 @@ let _assert num str out =
      (failwith
 	(Printf.sprintf
 	   "Failed %.2f with X_syntax_error: Tag parser failed to resolve expression '%s'"num str));;
-
+(*
 (*Boolean*)
 _assert 1.0 "#t" ( Const (Sexpr (Bool true)));;
 _assert 1.1 "#f" ( Const (Sexpr (Bool false)));;
@@ -488,16 +509,17 @@ _assert 7.0 "(if #t 2 \"abc\")"
 _assert 7.1 "(if #t 2)"
   (If (Const (Sexpr (Bool true)), Const (Sexpr (Number (Int 2))),
        (Const Void)));;
-
+*)
   (*SimpleLambda*)
-_assert 8.0 "(lambda (a b c) d)" (LambdaSimple (["a"; "b"; "c"], Var "d"));;
+(*_assert 8.0 "(lambda (a b c) d)" (LambdaSimple (["a"; "b"; "c"], Var "d"));;
 _assert 8.1 "(lambda (a b c) (begin d))" (LambdaSimple (["a"; "b"; "c"], Var "d"));;
 _assert 8.2 "(lambda (a b c) a b)" (LambdaSimple (["a"; "b"; "c"], Seq [Var "a"; Var "b"]));;
 _assert 8.3 "(lambda (a b c) (begin a b))" (LambdaSimple (["a"; "b"; "c"], Seq [Var "a"; Var "b"]));;
 _assert 8.4 "(lambda (a b c) (begin))" (LambdaSimple (["a"; "b"; "c"], Const Void));;
-_assertX 8.5 "(lambda (a b c d d) e f)";;
-_assert 8.6 "(lambda () e f)" (LambdaSimple( [], Seq [Var "e"; Var "f"])) ;;
-
+_assertX 8.5 "(lambda (a b c d d) e f)";;*)
+(*_assert 8.6 "(lambda () e f)" (LambdaSimple( [], Seq [Var "e"; Var "f"])) ;;
+*)
+(*
 (*Application*)
 _assert 11.0 "(+ 1 2 3)"
   (Applic (Var "+", [Const (Sexpr (Number (Int 1)));
@@ -573,7 +595,7 @@ _assert 20.10 "`(,a . ,@b)" (_tag_string "(cons a b)");;
 _assert 20.11 "`(((,@a)))" (_tag_string "(cons (cons (append a '()) '()) '())");;
 _assert 20.12 "`#(a ,b c ,d)" (_tag_string "(vector 'a b 'c d)");;
 *)
-
+*)
 
 
 (* `,x *)
@@ -590,6 +612,7 @@ test_function (Pair(Symbol "quasiquote", Pair(Pair(Symbol "a", Pair(Symbol "b", 
 test_function (Pair(Symbol "quasiquote", Pair(Pair(Pair(Symbol "unquote", Pair(Symbol "a", Nil)), Pair(Pair(Symbol "unquote-splicing", Pair(Symbol "b", Nil)), Nil)), Nil)))
 (Applic (Var "cons", [Var "a" ; (Applic (Var "append", [Var "b" ; Const(Sexpr(Nil));])) ])) ;;
 
+tag_parse (Pair(Symbol "lambda", Pair(Pair(Symbol "a", Symbol "b"), Pair(Symbol "x", Nil))));;
 
 end;; (* struct Tag_Parser *)
 
