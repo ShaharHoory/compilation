@@ -198,7 +198,7 @@ let expand_MITdefine sexpr = match sexpr with
 (* --------------------------------------tag parser -----------------------------------------------------------------  *)	
 
 let rec tag_parse sexpr = 
-let parsers = (disj_list [constParsers; ifParsers;lambdaParser; condParser ; quasiquoteParser; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers]) in parsers sexpr 
+let parsers = (disj_list [constParsers; ifParsers;lambdaParser; condParser ; quasiquoteParser; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers; andParser; letStarParsers; mitDefine;]) in parsers sexpr 
 
 and quasiquoteParser sexpr = match sexpr with
 	|Pair(Symbol "quasiquote", Pair(s,Nil)) -> tag_parse (quasiQuote_expander s)
@@ -559,7 +559,7 @@ _assert 17.2 "(let* ((e1 v1)(e2 v2)(e3 v3)) body)"
 print_string (print_sexpr (read_sexpr "(define (var . arglst) . (body))"));;*)
 
 (*Quasiquote*)
-_assert 20.0 "`,x" (_tag_string "x");;
+(*_assert 20.0 "`,x" (_tag_string "x");;
 _assertX 20.01 "`,@x";;
 _assert 20.02 "`(a b)" (_tag_string "(cons 'a (cons 'b '()))");;
 _assert 20.03 "`(,a b)" (_tag_string "(cons a (cons 'b '()))");;
@@ -572,10 +572,10 @@ _assert 20.09 "`(,@a . ,b)" (_tag_string "(append a b)");;
 _assert 20.10 "`(,a . ,@b)" (_tag_string "(cons a b)");;
 _assert 20.11 "`(((,@a)))" (_tag_string "(cons (cons (append a '()) '()) '())");;
 _assert 20.12 "`#(a ,b c ,d)" (_tag_string "(vector 'a b 'c d)");;
-
-
-
 *)
+
+
+
 (* `,x *)
 test_function (Pair(Symbol "quasiquote", Pair(Pair(Symbol "unquote", Pair(Symbol "x", Nil)), Nil))) (Var "x");;
 (* `() *)
