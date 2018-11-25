@@ -126,10 +126,14 @@ let rec extractVarsFromLet sexpr = match sexpr with
 	| Pair(Pair(Symbol(sym), value), ribs) -> Pair(Symbol(sym), extractVarsFromLet ribs)
 	| _ -> raise X_syntax_error
 
+(*GOAL - RETURN THIS AS PROPER LIST*)
+(*Input: Pair(Pair(Symbol "s", Pair(Number (Int 4), Nil)), Pair(Pair(Symbol "y", Pair(String "s", Nil)), Nil)) *)
+(*Current ouptput: (Pair(Number(Int(4)),String(s))*)
+(*Expected output: Pair(Number(Int(4)), Pair(String(s), Nil)))*)
 let rec extractSexprsFromLet sexpr = match sexpr with
 	| Pair(Pair(Symbol(sym), Nil), ribs) -> raise X_syntax_error (*let (x) (body) with no assignment to x is illegal*)
 	| Pair(Symbol(sym), Nil) -> raise X_syntax_error (*same reason*)
-	| Pair(Pair(Symbol(sym), Pair(sexp, Nil)), Nil) -> sexp
+	| Pair(Pair(Symbol(sym), Pair(sexp, Nil)), Nil) -> Pair(sexp, Nil)
 	| Pair(Symbol(sym), Pair(sexp, Nil)) -> sexp (*improper list case of the above case*)
 	| Pair(Pair(Symbol(sym), Pair(sexp, Nil)), ribs) -> Pair(sexp, extractSexprsFromLet ribs)
 	| _ -> raise X_syntax_error
@@ -198,12 +202,12 @@ if ((isUniq arglist) && (isProperList arguments) && (andmap is_not_reserved_word
 	| _ -> raise X_syntax_error
 
 and varParser sexpr = match sexpr with
-	| Symbol(e)->if (is_not_reserved_word e) then Var(e) else raise X_syntax_error
+	| Symbol(e) -> if (is_not_reserved_word e) then Var(e) else raise X_syntax_error
 	| _ -> raise X_syntax_error
 
 and orParser sexpr = match sexpr with
 	| Pair(Symbol("or"), Nil) -> Const(Sexpr(Bool(false)))
-	| Pair(Symbol("or"), Pair(oneArg, Nil)) -> Or(orHelper sexpr)
+	| Pair(Symbol("or"), Pair(oneArg, Nil)) -> tag_parse oneArg
 	| Pair(Symbol("or"), Pair (car, cdr)) -> Or(orHelper sexpr) 
 	(*| Pair(Symbol("or"), oneArg) -> tag_parse oneArg I Think this is ilegal - CHECK*)
 	| _ -> raise X_syntax_error
@@ -219,12 +223,13 @@ and applicationParser sexpr = match sexpr with
 	 and if it does - HANDLE THIS! *)
 	| _ -> raise X_syntax_error
 
+
 and applicationHelper sexpr = match sexpr with
 	| Pair(car, Nil) -> [tag_parse car]
 	| Pair(car, cdr) -> [tag_parse car] @ (applicationHelper cdr)
 	| Nil -> []
-	| oneArg -> [tag_parse oneArg]
-(*	| _ -> raise X_syntax_error *)
+	(*| oneArg -> [tag_parse oneArg]*)
+	| _ -> raise X_syntax_error 
 
 and explicitSeqParser sexpr = match sexpr with
 	| Pair(Symbol("begin"), Nil) -> Const(Void)
@@ -238,7 +243,7 @@ and explicitSeqHelper sexpr = match sexpr with
 	| _ -> raise X_syntax_error
 
 and definitionParser sexpr = match sexpr with
-	| Pair(Symbol("define"), Pair(Symbol(name), Pair(s, Nil))) -> Def(tag_parse (Symbol(name)), tag_parse s)
+	| Pair(Symbol("define"), Pair(name, Pair(s, Nil))) -> Def(varParser name, tag_parse s)
 	(*| Pair(Symbol("define"), Pair(Symbol(name), s)) -> Def(tag_parse (Symbol(name)), tag_parse s) - i think this is ilegal - CHECK*)
 	| _ -> raise X_syntax_error
 
@@ -247,15 +252,14 @@ and mitDefine sexpr = match sexpr with
 	| _ -> raise X_syntax_error
 
 and setBangParser sexpr = match sexpr with
-	| Pair(Symbol("set!"), Pair(Symbol(name), Pair(s, Nil))) -> Set(tag_parse (Symbol(name)), tag_parse s)
-	| Pair(Symbol("set!"), Pair(Symbol(name), s)) -> Set(tag_parse (Symbol(name)), tag_parse s)
+	| Pair(Symbol("set!"), Pair(name, Pair(s, Nil))) -> Set(varParser name, tag_parse s)
+	| Pair(Symbol("set!"), Pair(name, s)) -> Set(varParser name, tag_parse s)
 	| _ -> raise X_syntax_error
 
 and letParsers sexpr = match sexpr with
 	| Pair(Symbol("let"), Pair(ribs, Nil)) -> raise X_syntax_error (*let without body is invalid*)
-	| Pair(Symbol("let"), Pair(Nil, body)) -> tag_parse (Pair(Pair(Symbol("lambda"), Pair(Nil, body)), Nil))
-	| Pair(Symbol("let"), Pair(Pair(rib, ribs), body)) -> tag_parse (Pair(Pair(Symbol("lambda"), Pair(extractVarsFromLet (Pair(rib, ribs)), body)), extractSexprsFromLet (Pair(rib, ribs))))
-																											
+	| Pair(Symbol("let"), Pair(Nil, body)) -> tag_parse (Pair(Pair(Symbol("lambda"), Pair(Nil, body)), Nil))										(*I ADDED YTHIS NOW*)
+	| Pair(Symbol("let"), Pair(Pair(rib, ribs), body)) -> tag_parse (Pair(Pair(Symbol("lambda"), Pair(extractVarsFromLet (Pair(rib, ribs)), body)), extractSexprsFromLet (Pair(rib, ribs))))																										
 	| _ -> raise X_syntax_error
 
 and letStarParsers sexpr = match sexpr with
@@ -323,8 +327,6 @@ test_function (Pair(Symbol("if"), Pair(Bool(true), Pair(String("a"), Pair(String
 test_function (Pair(Symbol("if"), Pair(Bool(true), Pair(String("a"), Nil)))) 
 				(If (Const(Sexpr(Bool(true))), Const(Sexpr(String("a"))), Const(Void)));;
 
-(*or test*)
-test_function (Pair(Symbol "or", Pair(Pair(Symbol "quote", Pair(Symbol "a", Nil)), Nil))) (Or([(Const (Sexpr (Symbol "a")))]));;
 (*'(or #t #f 'a')*)
 test_function (Pair(Symbol "or", Pair(Bool true, Pair(Bool false, Pair(Pair(Symbol "quote", Pair(Char 'a', Nil)), Nil))))) 
 	((Or [Const (Sexpr (Bool true)); Const (Sexpr (Bool false)); Const (Sexpr (Char 'a'))]));;
@@ -351,7 +353,7 @@ test_sexprs_equal (extractSexprsFromLet (Pair((Pair(Symbol("x"), Number(Int 1)),
 (*improper case*)
 test_sexprs_equal (extractSexprsFromLet (Pair((Pair(Symbol("x"), Number(Int 1)), Pair(Symbol("y"), Number(Int(2))))))) (Pair(Number(Int(1)), Number(Int(2)))
 );;
-
+*)
 
 (*applic tests*)
 test_function (Pair(Symbol("+"), Pair(Number(Int 1), Pair(Number(Int 2), Nil)))) (Applic(Var("+"), [Const(Sexpr(Number(Int(1)))); Const(Sexpr(Number(Int(2))))]));;
@@ -362,20 +364,21 @@ test_function (Pair(Pair(Symbol("lambda"), Pair(Nil, Pair(Number (Int 1), Nil)))
 let letParsersToSexpr sexpr = 
 	match sexpr with
 		| Pair(Symbol("let"), Pair(ribs, Nil)) -> raise X_syntax_error (*let without body is invalid*)
-		| Pair(Symbol("let"), Pair(Nil, body)) -> Pair(Pair(Symbol("lambda"), Pair(Nil, body)), Nil)
-		(*| Pair(Symbol("let"), Pair(Nil, Pair(body, Nil))) -> tag_parse (Pair(Pair(Symbol("lambda"), Pair(Nil, body)), Nil)) I THINK that
-																									the above's case covers also this case*)
-		| Pair(Symbol("let"), Pair(Pair(rib, ribs), body)) -> Pair(Pair(Symbol("lambda"), Pair(extractVarsFromLet (Pair(rib, ribs)), body)), extractSexprsFromLet (Pair(rib, ribs)))
-		(*| Pair(Symbol("let"), Pair(oneRib, body)) -> TODO*)
-		(*| Pair(Symbol("let"), Pair(Pair(rib, ribs), Pair(body, Nil))) -> tag_parse (Pair(Pair(Symbol("lambda"), Pair(extractVarsFromLet (Pair(rib, ribs)), body)), extractSexprsFromLet (Pair(rib, ribs))))
-																											same comment for here too*)
+		| Pair(Symbol("let"), Pair(Nil, body)) -> Pair(Pair(Symbol("lambda"), Pair(Nil, body)), Nil)										(*I ADDED YTHIS NOW*)
+		| Pair(Symbol("let"), Pair(Pair(rib, ribs), body)) -> Pair(Pair(Symbol("lambda"), Pair(extractVarsFromLet (Pair(rib, ribs)), body)), Pair(extractSexprsFromLet (Pair(rib, ribs)), Nil))																									
 		| _ -> raise X_syntax_error;;
+(*
 (*sexpression equality in let*)
 test_sexprs_equal (letParsersToSexpr (Pair(Symbol("let"), Pair(Nil, Pair(Number (Int 1), Nil))))) (Pair(Pair(Symbol("lambda"), Pair(Nil, Pair(Number (Int 1), Nil))), Nil));;
 test_sexprs_equal (letParsersToSexpr (Pair(Symbol("let"), Pair(Pair(Symbol("x"), Pair(Number(Int 1), Nil)), Symbol("x"))))) (Pair(Pair(Symbol("lambda"), Pair(Pair(Symbol("x"), Nil), Symbol("x"))), Pair(Number(Int 1), Nil)));;
-*)
 (*real let tests*)
 test_function (Pair(Symbol("let"), Pair(Nil, Pair(Number (Int 1), Nil)))) (Applic(LambdaSimple([], Const(Sexpr(Number(Int(1))))), []));;
+*)
+
+(*
+print_string (print_sexpr (letParsersToSexpr (Pair(Symbol "let", Pair(Pair(Pair(Symbol "s", Pair(Number (Int 4), Nil)), Pair(Pair(Symbol "y", Pair(String "s", Nil)), Nil)), Pair(Symbol "g", Pair(Symbol "f", Pair(Number (Int 3), Nil))))))));;
+Pair(Pair(Symbol(lambda),Pair(Pair(Symbol(s),Pair(Symbol(y),Nil)),Pair(Symbol(g),Pair(Symbol(f),Pair(Number(Int(3)),Nil))))),Pair(Pair(Number(Int(4)),Pair(String(s),Nil)),Nil))
+*)
 
 (*TESTS FROM FACEBOOK*)
 
@@ -482,7 +485,7 @@ _assert 12.0 "(or #t #f #\\a)"
      [Const (Sexpr (Bool true)); Const (Sexpr (Bool false));
       Const (Sexpr (Char 'a'))]);;
 
-_assert 12.1 "(or 'a)"  (Or [Const (Sexpr (Symbol "a"))]);;
+(*_assert 12.1 "(or 'a)"  (Or [Const (Sexpr (Symbol "a"))]);;*)
 
 _assert 12.2 "(or)"
   (Const (Sexpr (Bool false)));;
@@ -514,10 +517,10 @@ _assert 16.2 "(and e1 e2 e3 e4)"
 
 (*Let* *)
 _assert 17.0 "(let* () body)" (Applic (LambdaSimple ([], Var "body"), []));;
-_assert 17.1 "(let* ((e1 v1)) body)" (Applic (LambdaSimple (["e1"], Var "body"), [Var "v1"]));;
+(*_assert 17.1 "(let* ((e1 v1)) body)" (Applic (LambdaSimple (["e1"], Var "body"), [Var "v1"]));;
 _assert 17.2 "(let* ((e1 v1)(e2 v2)(e3 v3)) body)"
   (Applic (LambdaSimple (["e1"], Applic (LambdaSimple (["e2"], Applic (LambdaSimple (["e3"], Var "body"),
-   [Var "v3"])), [Var "v2"])), [Var "v1"]));;
+   [Var "v3"])), [Var "v2"])), [Var "v1"]));;*)
 
 (*MIT define*)
 (*_assert 18.0 "(define (var . arglst) . (body))" (_tag_string "(define var (lambda arglst body))");;
