@@ -101,7 +101,7 @@ let rec isProperList_LastElement arglist =
 	|Pair (exp1, Pair(exp_1, exp_2)) -> isProperList_LastElement (Pair(exp_1, exp_2))
 	|Pair (exp1, expr2) -> sexprToString expr2
 	|Nil->""
-	| _ -> raise X_no_match;;
+	| _ -> raise X_syntax_error;;
 
 let rec makeStringList arglist = 
 	match arglist with
@@ -130,6 +130,32 @@ let rec uniq x =
 
 let isUniq x = List.length (uniq x) == List.length (x);;
 
+
+let rec print_sexpr = fun sexprObj ->
+  match sexprObj  with
+    | Bool(true) -> "Bool(true)"
+    | Bool(false) -> "Bool(false)"
+    | Nil -> "Nil"
+    | Number(Int(e)) -> Printf.sprintf "Number(Int(%d))" e
+    | Number(Float(e)) -> Printf.sprintf "Number(Float(%f))" e
+    | Char(e) -> Printf.sprintf "Char(%c)" e
+    | String(e) -> Printf.sprintf "String(%s)" e
+    | Symbol(e) -> Printf.sprintf "Symbol(%s)" e
+    | Pair(e,s) -> Printf.sprintf "Pair(%s,%s)" (print_sexpr e) (print_sexpr s) 
+    | Vector(list)-> Printf.sprintf "vector(%s)" (print_sexprs list)
+
+and 
+
+print_sexprs = fun sexprList -> 
+  match sexprList with
+    | [] -> ""
+    | head :: tail -> (print_sexpr head) ^ "," ^ (print_sexprs tail)
+
+let print_sexprs_as_list = fun sexprList ->
+  let sexprsString = print_sexprs sexprList in
+    "[ " ^ sexprsString ^ " ]";;
+
+
 (*let helpers*)
 let rec extractVarsFromLet sexpr = match sexpr with
 	| Pair(Pair(Symbol(sym), Nil), ribs) -> raise X_syntax_error (*let (x) (body) with no assignment to x is illegal*)
@@ -148,6 +174,23 @@ let rec extractSexprsFromLet sexpr = match sexpr with
 	| Pair(Pair(Symbol(sym), Pair(sexp, Nil)), Nil) -> Pair(sexp, Nil)
 	| Pair(Symbol(sym), Pair(sexp, Nil)) -> sexp (*improper list case of the above case*)
 	| Pair(Pair(Symbol(sym), Pair(sexp, Nil)), ribs) -> Pair(sexp, extractSexprsFromLet ribs)
+	| _ -> raise X_syntax_error
+
+(*Letrec helpers*)
+let rec makeLetRecInitiations sexpr = match sexpr with
+	| Pair(Pair(Symbol(sym), Nil), ribs) -> raise X_syntax_error (*letrec (x) (body) with no assignment to x is illegal*)
+	| Pair(Symbol(sym), Nil) -> raise X_syntax_error (*same reason*)
+	| Pair(Pair(Symbol(sym), value), Nil) -> Pair(Symbol(sym), Pair(Pair(Symbol("quote"), Pair(Symbol("whatever"), Nil)), Nil))
+	| Pair(Symbol(sym), value) -> Pair(Symbol(sym), Pair(Pair(Symbol("quote"), Pair(Symbol("whatever"), Nil)), Nil)) (*improper list case of the above case*)
+	| Pair(Pair(Symbol(sym), value), ribs) -> Pair(Pair(Symbol(sym), Pair(Pair(Symbol("quote"), Pair(Symbol("whatever"), Nil)), Nil)), makeLetRecInitiations ribs)
+	| _ -> raise X_syntax_error
+
+let rec makeLetRecBody ribsPair body = match ribsPair with
+	| Pair(Pair(Symbol(sym), Nil), ribs) -> raise X_syntax_error (*let (x) (body) with no assignment to x is illegal*)
+	| Pair(Symbol(sym), Nil) -> raise X_syntax_error (*same reason*) 
+	| Pair(Pair(Symbol(sym), Pair(sexp, Nil)), Nil) -> Pair(Pair(Symbol("set!"), Pair(Symbol(sym), Pair(sexp, Nil))), body)
+	| Pair(Symbol(sym), Pair(sexp, Nil))-> Pair(Pair(Symbol("set!"), Pair(Symbol(sym), Pair(sexp, Nil))), body) (*improper list case of the above case*)
+	| Pair(Pair(Symbol(sym), Pair(sexp, Nil)), ribs) -> Pair(Pair(Symbol("set!"), Pair(Symbol(sym), Pair(sexp, Nil))), (makeLetRecBody ribs body))
 	| _ -> raise X_syntax_error
 
 (*Expanders*)
@@ -197,6 +240,7 @@ let expand_and sexpr = match sexpr with
 
 
 (*let helpers*)
+
 let rec extractVarsFromLet sexpr = match sexpr with
 	| Pair(Pair(Symbol(sym), Nil), ribs) -> raise X_syntax_error (*let (x) (body) with no assignment to x is illegal*)
 	| Pair(Symbol(sym), Nil) -> raise X_syntax_error (*same reason*)
@@ -210,10 +254,17 @@ let expand_MITdefine sexpr = match sexpr with
 	| Pair(Symbol("define"), Pair(Pair(Symbol(var), arglist), Pair(onesexp, Nil))) -> Pair(Symbol("define"), Pair(Symbol(var), Pair(Pair(Symbol("lambda"), Pair(arglist, Pair(onesexp, Nil))), Nil)))
 	| _ -> raise X_syntax_error
 
+let expand_letRec sexpr = match sexpr with
+ 	| Pair(Symbol("letrec"), Pair(ribs, Nil)) -> raise X_syntax_error (* letrec without body is invalid*)
+	| Pair(Symbol("letrec"), Pair(Nil, body)) -> Pair(Symbol("let"), Pair(Nil, body))
+	(*| Pair(Symbol("letrec"), Pair(Pair(rib, Nil), body)) -> *)
+	| Pair(Symbol("letrec"), Pair(Pair(rib, ribs), body)) -> Pair(Symbol("let"), Pair(Pair(makeLetRecInitiations (Pair(rib, ribs)), Nil), (makeLetRecBody (Pair(rib, ribs)) body)))
+	| _ -> raise X_syntax_error;;
+
 (* --------------------------------------tag parser -----------------------------------------------------------------  *)	
 
 let rec tag_parse sexpr = 
-let parsers = (disj_list [constParsers; ifParsers;lambdaParser; condParser ; quasiquoteParser; varParser; orParser; applicationParser; explicitSeqParser; definitionParser; setBangParser; letParsers; andParser; letStarParsers; mitDefine;]) in parsers sexpr 
+let parsers = (disj_list [constParsers; letRecParsers; varParser;  applicationParser; letParsers; lambdaParser; ifParsers; condParser ; quasiquoteParser;  orParser;  explicitSeqParser; definitionParser; andParser; letStarParsers; mitDefine;]) in parsers sexpr 
 
 and quasiquoteParser sexpr = match sexpr with
 	|Pair(Symbol "quasiquote", Pair(s,Nil)) -> tag_parse (quasiQuote_expander s)
@@ -238,9 +289,6 @@ and ifParsers sexpr = match sexpr with
 	(*This is in case we should support case when the else is improper CHECK THIS*)
 	(*| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, e_else))) -> If((tag_parse e_cond), (tag_parse e_then), (tag_parse e_else)) *)
 	| _ -> raise X_syntax_error
-
-(*tag_parse (Pair(Symbol "lambda", Pair(Pair(Symbol "a", Symbol "b"), Pair(Symbol "x", Nil))));;
-*)
 
 and lambdaParser sexpr = match sexpr with
 	| Pair (Symbol "lambda", Pair (Symbol(vs), body)) -> 
@@ -315,11 +363,15 @@ and setBangParser sexpr = match sexpr with
 and letParsers sexpr = match sexpr with
 	| Pair(Symbol("let"), Pair(ribs, Nil)) -> raise X_syntax_error (*let without body is invalid*)
 	| Pair(Symbol("let"), Pair(Nil, body)) -> tag_parse (Pair(Pair(Symbol("lambda"), Pair(Nil, body)), Nil))										(*I ADDED YTHIS NOW*)
-	| Pair(Symbol("let"), Pair(Pair(rib, ribs), body)) -> tag_parse (Pair(Pair(Symbol("lambda"), Pair(extractVarsFromLet (Pair(rib, ribs)), body)), extractSexprsFromLet (Pair(rib, ribs))))																										
-	| _ -> raise X_syntax_error
+	| Pair(Symbol("let"), Pair(Pair(rib, ribs), body)) -> (print_string (print_sexpr sexpr)); tag_parse (Pair(Pair(Symbol("lambda"), Pair(extractVarsFromLet (Pair(rib, ribs)), body)), extractSexprsFromLet (Pair(rib, ribs))))																										
+	| _ ->  (print_string (print_sexpr sexpr));  raise X_no_match
 
 and letStarParsers sexpr = match sexpr with
 	| Pair(Symbol("let*"), rest) -> tag_parse (expand_letStar sexpr)
+	| _ -> raise X_syntax_error
+
+and letRecParsers sexpr = match sexpr with
+	| Pair(Symbol("letrec"), rest) -> tag_parse (expand_letRec sexpr)
 	| _ -> raise X_syntax_error
 
 and andParser sexpr = match sexpr with
@@ -331,34 +383,10 @@ let tag_parse_expression sexpr = tag_parse sexpr;;
 let tag_parse_expressions sexpr = raise X_not_yet_implemented;;
 
 (*tests*)
-let failure_info = ref "as not as expected"
-let got = ref "Not A Real Got"
-let expected = ref "Not A Real Expected"
 
-let rec print_sexpr = fun sexprObj ->
-  match sexprObj  with
-    | Bool(true) -> "Bool(true)"
-    | Bool(false) -> "Bool(false)"
-    | Nil -> "Nil"
-    | Number(Int(e)) -> Printf.sprintf "Number(Int(%d))" e
-    | Number(Float(e)) -> Printf.sprintf "Number(Float(%f))" e
-    | Char(e) -> Printf.sprintf "Char(%c)" e
-    | String(e) -> Printf.sprintf "String(%s)" e
-    | Symbol(e) -> Printf.sprintf "Symbol(%s)" e
-    | Pair(e,s) -> Printf.sprintf "Pair(%s,%s)" (print_sexpr e) (print_sexpr s) 
-    | Vector(list)-> Printf.sprintf "vector(%s)" (print_sexprs list)
 
-and 
-
-print_sexprs = fun sexprList -> 
-  match sexprList with
-    | [] -> ""
-    | head :: tail -> (print_sexpr head) ^ "," ^ (print_sexprs tail)
-
-let print_sexprs_as_list = fun sexprList ->
-  let sexprsString = print_sexprs sexprList in
-    "[ " ^ sexprsString ^ " ]";;
-
+(*print_string (print_sexpr (expand_letRec (Pair(Symbol "letrec", Pair(Pair(Pair(Symbol "s", Pair(Number (Int 4), Nil)), Nil), Pair(Symbol "g", Pair(Symbol "f", Nil)))))))
+*)
 (*OUR TESTS*)
 let test_function sexpr expected_expr = 
 	let check =  expr_eq (tag_parse sexpr) expected_expr in
@@ -524,7 +552,9 @@ _assert 8.4 "(lambda (a b c) (begin))" (LambdaSimple (["a"; "b"; "c"], Const Voi
 _assertX 8.5 "(lambda (a b c d d) e f)";;*)
 (*_assert 8.6 "(lambda () e f)" (LambdaSimple( [], Seq [Var "e"; Var "f"])) ;;
 *)
+
 (*
+
 (*Application*)
 _assert 11.0 "(+ 1 2 3)"
   (Applic (Var "+", [Const (Sexpr (Number (Int 1)));
@@ -616,6 +646,8 @@ test_function (Pair(Symbol "quasiquote", Pair(Pair(Pair(Symbol "unquote", Pair(S
 
 tag_parse (Pair(Symbol "lambda", Pair(Pair(Symbol "a", Symbol "b"), Pair(Symbol "x", Nil))));;
 
-end;; (* struct Tag_Parser *)
+*)
 
+tag_parse (Pair(Symbol "letrec", Pair(Pair(Pair(Symbol "s", Pair(Number (Int 4), Nil)), Nil), Pair(Symbol "g", Pair(Symbol "f", Nil)))));;
+end;; (* struct Tag_Parser *)
 
