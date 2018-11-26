@@ -357,8 +357,7 @@ and definitionParser sexpr = match sexpr with
 	| Pair(Symbol("define"), Pair(name, Pair(s, Nil))) -> Def(varParser name, tag_parse s)
 	| _ -> raise X_syntax_error
 
-and mitDefine sexpr = match sexpr with(*
-	| Pair(Symbol("define"), Pair(Pair(var, arglist), exprs)) -> tag_parse (expand_MITdefine var arglist exprs)*)
+and mitDefine sexpr = match sexpr with
 	| Pair(Symbol("define"), Pair(Pair(Symbol(name), arglist), sexps)) -> tag_parse (expand_MITdefine sexpr)
 	| _ -> raise X_syntax_error
 
