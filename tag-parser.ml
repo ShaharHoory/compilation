@@ -231,7 +231,7 @@ let expand_letStar sexpr = match sexpr with
 		Pair(Symbol "if", Pair(expr, Pair(Pair(Symbol "begin", expr_n), (condExpander rest))))
 	| Nil -> Nil
 	| _ -> raise X_no_match
-
+*)
 
 let rec condExpander sexpr = 
 	match sexpr with
@@ -247,7 +247,7 @@ let rec condExpander sexpr =
 		(* if expr then begin expr_n else --> rest *)
 		Pair(Symbol "if", Pair(expr, Pair(Pair(Symbol "begin", expr_n), Pair((condExpander rest),Nil))))
 	| Nil -> Nil
-	| _ -> raise X_not_yet_implemented
+	| _ -> raise X_syntax_error
 
 
 
