@@ -253,24 +253,19 @@ let rec extractVarsFromLet sexpr = match sexpr with
 	| _ -> raise X_syntax_error
 
 let expand_MITdefine sexpr = match sexpr with
-	| Pair(Symbol("define"), Pair(Pair(Symbol(var), arglist), Pair(Pair(body1, body2), Nil))) -> Pair(Symbol("define"), Pair(Symbol(var), Pair(Pair(Symbol("lambda"), Pair(arglist, Pair(body1, body2))), Nil)))
-	| Pair(Symbol("define"), Pair(Pair(Symbol(var), arglist), Pair(onesexp, Nil))) -> Pair(Symbol("define"), Pair(Symbol(var), Pair(Pair(Symbol("lambda"), Pair(arglist, Pair(onesexp, Nil))), Nil)))
+	| Pair(Symbol("define"), Pair(Pair(Symbol(var), arglist), exprs)) -> Pair(Symbol("define"), Pair(Symbol(var), Pair(Pair(Symbol("lambda"), Pair(arglist, exprs)), Nil)))
 	| _ -> raise X_syntax_error
-
 
 let expand_letRec sexpr = match sexpr with
  	| Pair(Symbol("letrec"), Pair(ribs, Nil)) -> raise X_syntax_error (* letrec without body is invalid*)
 	| Pair(Symbol("letrec"), Pair(Nil, body)) -> Pair(Symbol("let"), Pair(Nil, body))
-	(*| Pair(Symbol("letrec"), Pair(Pair(rib, Nil), body)) -> *)
 	| Pair(Symbol("letrec"), Pair(Pair(rib, ribs), body)) -> Pair(Symbol("let"), Pair(makeLetRecInitiations (Pair(rib, ribs)), (makeLetRecBody (Pair(rib, ribs)) body)))
 	| _ -> raise X_syntax_error;;
 
 (* --------------------------------------tag parser -----------------------------------------------------------------  *)	
 
 let rec tag_parse sexpr = 
-let parsers = (disj_list [constParsers; setBangParser; letRecParsers; varParser;  letParsers; lambdaParser; ifParsers; condParser ; quasiquoteParser;  orParser;  explicitSeqParser; definitionParser; andParser; letStarParsers; mitDefine;  applicationParser;]) in parsers sexpr 
-
- 
+let parsers = (disj_list [constParsers; setBangParser; letRecParsers; varParser; letParsers; lambdaParser; ifParsers; condParser ; quasiquoteParser;  orParser;  explicitSeqParser; defineParser; andParser; letStarParsers; applicationParser;]) in parsers sexpr 
 
 and quasiquoteParser sexpr = match sexpr with
 	|Pair(Symbol "quasiquote", Pair(s,Nil)) -> tag_parse (quasiQuote_expander s)
@@ -294,8 +289,6 @@ and ifParsers sexpr = match sexpr with
 	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Pair(Nil, Nil)))) -> If((tag_parse e_cond), (tag_parse e_then), Const(Void))
 	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Nil))) -> If((tag_parse e_cond), (tag_parse e_then), Const(Void))
 	| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, Pair(e_else, Nil)))) -> If((tag_parse e_cond), (tag_parse e_then), (tag_parse e_else))
-	(*This is in case we should support case when the else is improper CHECK THIS*)
-	(*| Pair(Symbol("if"), Pair(e_cond, Pair(e_then, e_else))) -> If((tag_parse e_cond), (tag_parse e_then), (tag_parse e_else)) *)
 	| _ -> raise X_syntax_error
 
 
@@ -342,6 +335,7 @@ and applicationHelper sexpr = match sexpr with
 	| Nil -> []
 	(*| oneArg -> [tag_parse oneArg]*)
 	| _ -> raise X_syntax_error 
+
 and explicitSeqParser sexpr = match sexpr with
 	| Pair(Symbol("begin"), Nil) -> Const(Void)
 	| Pair(Symbol("begin"), Pair(car, Nil)) -> tag_parse car
@@ -354,22 +348,24 @@ and explicitSeqHelper sexpr = match sexpr with
 	| Pair(Symbol("begin"), Pair(car, cdr)) -> [tag_parse car] @ (explicitSeqHelper (Pair(Symbol("begin"), cdr)))
 	| _ -> raise X_syntax_error
 
+and defineParser sexpr = 
+	let parser = (disj mitDefine definitionParser) in
+		parser sexpr
+
+
 and definitionParser sexpr = match sexpr with
 	| Pair(Symbol("define"), Pair(name, Pair(s, Nil))) -> Def(varParser name, tag_parse s)
-	(*| Pair(Symbol("define"), Pair(Symbol(name), s)) -> Def(tag_parse (Symbol(name)), tag_parse s) - i think this is ilegal - CHECK*)
 	| _ -> raise X_syntax_error
 
-and mitDefine sexpr = match sexpr with (*TODO: check that symbol(var) is Var (send to varParser)*)
-	| Pair(Symbol("define"), Pair(Pair(Symbol(var), arglist), Pair(sexps, Nil))) -> tag_parse (expand_MITdefine sexpr)
+and mitDefine sexpr = match sexpr with(*
+	| Pair(Symbol("define"), Pair(Pair(var, arglist), exprs)) -> tag_parse (expand_MITdefine var arglist exprs)*)
+	| Pair(Symbol("define"), Pair(Pair(Symbol(name), arglist), sexps)) -> tag_parse (expand_MITdefine sexpr)
 	| _ -> raise X_syntax_error
 
 and setBangParser sexpr = match sexpr with
 	| Pair(Symbol("set!"), Pair(name, Pair(s, Nil))) -> Set(varParser name, tag_parse s)
-	| Pair(Symbol("set!"), Pair(name, s)) -> Set(varParser name, tag_parse s)
 	| _ -> raise X_syntax_error
 
-(*Pair(Symbol(let),    Pair(Pair(Pair(Symbol(s),    Pair(Pair(Symbol(quote),     Pair(Symbol(whatever),    Nil)),Nil)),Nil),       Pair(Pair(Symbol(set!),    Pair(Symbol(s),    Pair(Number(Int(4)),Nil))),  Pair(Symbol(g),    Pair(Symbol(f),Nil))) ))
-*)
 and letParsers sexpr = match sexpr with
 	| Pair(Symbol("let"), Pair(ribs, Nil)) -> raise X_syntax_error (*let without body is invalid*)
 	| Pair(Symbol("let"), Pair(Nil, body)) ->  tag_parse (Pair(Pair(Symbol("lambda"), Pair(Nil, body)), Nil))										(*I ADDED YTHIS NOW*)
@@ -399,6 +395,7 @@ let tag_parse_expressions sexpr = tag_parse_expressions_helper sexpr ;;
 	 
 
 
+print_string (print_sexpr (expand_MITdefine (Pair(Symbol "define", Pair(Pair(Symbol "func", Pair(Symbol "a", Pair(Symbol "b", Nil))), Pair(Pair(Symbol "if", Pair(Number (Int 5), Pair(Number (Int 4), Pair(Number (Int 3), Nil)))),Nil))))));;
 
 end;; (* struct Tag_Parser *)
 
