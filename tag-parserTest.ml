@@ -553,9 +553,8 @@ let test_Tag_Parse_Expressions = fun () ->
     test 4 (expr_eq_as_list (execute_tag_parse_expressions_as_list ([Pair(Symbol "and", Pair(String "hello", Pair(Symbol "v", Nil))); Pair(Symbol "letrec", Pair(Pair(Pair(Symbol "s", Pair(Number (Int 4), Nil)), Nil), Pair(Symbol "g", Pair(Symbol "f", Nil)))); Pair(Symbol "cond", Pair(Pair(Symbol "f", Pair(Symbol "=>", Pair(Symbol "g", Nil))), Nil))])) (execute_expected_as_list([If(Const(Sexpr(String("hello"))),Var("v"),Const(Sexpr(Bool(false)))); Applic(LambdaSimple(["s"],Seq([Set(Var("s"), Const(Sexpr(Number(Int(4))))); Var("g"); Var("f")])),[Const(Sexpr(Symbol "whatever"))]); Applic(LambdaSimple(["value"; "f"],If(Var("value"),Applic(Applic(Var("f"),[]),[Var("value")]),Const(Void))),[Var("f");LambdaSimple([],Var("g"))])])));
     ;;    
     
-(*let tests = test_Self_Evaluated :: test_Variable :: test_Conditionals :: test_Lambda_Expressions :: test_Applications :: test_Disjunctions :: test_Definitions :: test_Assignments :: test_Sequences :: test_Quasiquoted_Macro_Expansion :: test_Cond_Macro_Expansion :: test_Let_Macro_Expansion :: test_Let_Star_Macro_Expansion :: test_Let_Rec_Macro_Expansion :: test_And_Macro_Expansion :: test_Tag_Parse_Expressions :: [];;
-*)
-let tests = test_Cond_Macro_Expansion :: [];;
+let tests = test_Self_Evaluated :: test_Variable :: test_Conditionals :: test_Lambda_Expressions :: test_Applications :: test_Disjunctions :: test_Definitions :: test_Assignments :: test_Sequences :: test_Quasiquoted_Macro_Expansion :: test_Cond_Macro_Expansion :: test_Let_Macro_Expansion :: test_Let_Star_Macro_Expansion :: test_Let_Rec_Macro_Expansion :: test_And_Macro_Expansion :: test_Tag_Parse_Expressions :: [];;
+
 
 let rec start_tests = fun tests ->
     let print_info = fun exn stackTrace -> 

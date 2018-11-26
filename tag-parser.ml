@@ -388,30 +388,16 @@ and andParser sexpr = match sexpr with
 	| Pair(Symbol("and"), rest) -> tag_parse (expand_and sexpr)
 	| _ -> raise X_syntax_error
 
+
 let tag_parse_expression sexpr = tag_parse sexpr;;
 
-let tag_parse_expressions sexpr = raise X_not_yet_implemented;;
+let rec tag_parse_expressions_helper sexpr = match sexpr with 
+	| [] -> []
+	| head :: tail -> [tag_parse_expression head] @ (tag_parse_expressions_helper tail);;
 
-(*tests*)
+let tag_parse_expressions sexpr = tag_parse_expressions_helper sexpr ;;
+	 
 
-(*OUR TESTS*)
-let test_function sexpr expected_expr = 
-	let check =  expr_eq (tag_parse sexpr) expected_expr in
-	if check = false then print_string("problem with sexpr "^(print_sexpr sexpr)^"\n");;
-
-let test_sexprs_equal sexpr expected_sexpr = 
-	let check =  sexpr_eq sexpr expected_sexpr in
-	if check = false then print_string("problem with sexpr "^(print_sexpr sexpr)^"\n");;
-
-
-
-(*let tests*)
-let letParsersToSexpr sexpr = 
-	match sexpr with
-		| Pair(Symbol("let"), Pair(ribs, Nil)) -> raise X_syntax_error (*let without body is invalid*)
-		| Pair(Symbol("let"), Pair(Nil, body)) -> Pair(Pair(Symbol("lambda"), Pair(Nil, body)), Nil)										(*I ADDED YTHIS NOW*)
-		| Pair(Symbol("let"), Pair(Pair(rib, ribs), body)) -> Pair(Pair(Symbol("lambda"), Pair(extractVarsFromLet (Pair(rib, ribs)), body)), Pair(extractSexprsFromLet (Pair(rib, ribs)), Nil))																									
-		| _ -> raise X_syntax_error;;
 
 
 end;; (* struct Tag_Parser *)
