@@ -216,22 +216,6 @@ let expand_letStar sexpr = match sexpr with
 	| Pair(Symbol("let*"), Pair(Pair(rib, ribs), body)) -> Pair(Symbol("let"), Pair(Pair(rib, Nil), Pair(Pair(Symbol("let*"), Pair(ribs, body)), Nil)))
 	| _ -> raise X_syntax_error;;
 
-(*let rec condExpander sexpr = 
-	match sexpr with
-	| Pair(Pair(expr, Pair(Symbol "=>", expr_f)), Nil) -> 
-		Pair(Symbol "let", Pair(Pair(Pair(Symbol "value", Pair(expr, Nil)), Pair(Pair(Symbol "f", Pair(Pair(Symbol "lambda", Pair(Nil, Pair(expr_f, Nil))), Nil)), Pair(Pair(Symbol "if", Pair(Symbol "value", Pair(Pair(Pair(Symbol "f", Nil), Pair(Symbol "value", Nil)), Nil))), Nil))), Nil))
-	| Pair(Pair(expr, Pair(Symbol "=>", expr_f)), rest) -> 
-		(* let (value = expr, f = lambda() expr_f) ==> if value ((f) value) else -> rest *)
-		Pair(Symbol "let", Pair(Pair(Pair(Symbol "value", Pair(expr, Nil)), Pair(Pair(Symbol "f", Pair(Pair(Symbol "lambda", Pair(Nil, Pair(expr_f, Nil))), Nil)), Pair(Pair(Symbol "rest", Pair(Pair(Symbol "lambda", Pair(Nil, (condExpander rest))), Nil)), Nil))), Pair(Pair(Symbol "if", Pair(Symbol "value", Pair(Pair(Pair(Symbol "f", Nil), Pair(Symbol "value", Nil)), Pair(Pair(Symbol "rest", Nil), Nil)))), Nil)))
-	| Pair(Pair(Symbol "else", expr_n),rest) -> 
-		(* begin else *)
-		Pair(Symbol "begin", expr_n) (*was before: (Symbol "begin", Pair(expr_n,Nil) , also for 2 lines below*)
-	| Pair(Pair(expr, expr_n), rest) -> 
-		(* if expr then begin expr_n else --> rest *)
-		Pair(Symbol "if", Pair(expr, Pair(Pair(Symbol "begin", expr_n), (condExpander rest))))
-	| Nil -> Nil
-	| _ -> raise X_no_match
-*)
 
 let rec condExpander sexpr = 
 	match sexpr with
@@ -240,7 +224,7 @@ let rec condExpander sexpr =
 	| Pair(Pair(expr, Pair(Symbol "=>", Pair(expr_f,Nil))), rest) -> 
 		(* let (value = expr, f = lambda() expr_f) ==> if value ((f) value) else -> rest *)
 		Pair(Symbol "let", Pair(Pair(Pair(Symbol "value", Pair(expr, Nil)), Pair(Pair(Symbol "f", Pair(Pair(Symbol "lambda", Pair(Nil, Pair(expr_f, Nil))), Nil)), Pair(Pair(Symbol "rest", Pair(Pair(Symbol "lambda", Pair(Nil, Pair((condExpander rest),Nil))), Nil)), Nil))),Pair(Pair(Symbol "if", Pair(Symbol "value", Pair(Pair(Pair(Symbol "f", Nil), Pair(Symbol "value", Nil)), Pair(Pair(Symbol "rest", Nil), Nil)))), Nil)))
-	| Pair(Pair(Symbol "else", expr_n),rest) -> 
+	| Pair(Pair(Symbol "else", expr_n),Nil) -> 
 		(* begin else *)
 		Pair(Symbol "begin", expr_n) (*was before: (Symbol "begin", Pair(expr_n,Nil) , also for 2 lines below*)
 	| Pair(Pair(expr, expr_n), rest) -> 
