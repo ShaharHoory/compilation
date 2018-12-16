@@ -4,7 +4,11 @@
  * Programmer: Mayer Goldberg, 2018
  *)
 
+
+#use "reader.ml";;
 #use "tag-parser.ml";;
+open Reader
+open Tag_Parser
 
 
 type var = 
@@ -70,6 +74,28 @@ module Semantics : SEMANTICS = struct
 
 (* ************************    Utilities ****************************************************************** *)
 (* returns pair of last element and the rest *)
+let cartesian l l' = 
+  List.concat (List.map (fun e -> List.map (fun e' -> (e,e')) l') l)
+
+(*list of pairs of vars [(a,b), (c,d), (f,b)] *)
+let rec isBoxNeeded lst = match lst with 
+	| [] -> false
+	| (a,b) :: tail -> if a==b then (isBoxNeeded tail) else true;;
+
+let diff l1 l2 = List.filter (fun x -> not (List.mem x l2)) l1;;
+
+
+let getVarName variable =  match variable with
+	| VarParam(name, minor) -> name
+	| VarFree(name) -> name
+	| VarBound(name, major, minor) -> name;;
+
+let getElementIndex name lst = 
+	let rec f rest i = match rest with 
+		| [] -> -1
+		| head :: tail -> if (compare head name == 0) then i else (f tail (i+1)) in
+	f lst 0;;
+
 let separateList lst = 
 	let reversed = (List.rev lst) in
 	let last = (List.hd reversed) in
@@ -173,27 +199,84 @@ and applicHandler app args isTail=
 
 let annotate_tail_calls e = tail_calls e false;;
 
-let boxHandler body param = 
+let counter = 0 ;; (*maybe box *)
+
+let appendReadWrites lst = 
+	let rec f lst reads writes = match lst with
+	| [] -> (reads, writes)
+	| (param, read,write) :: tail ->  f tail (reads @ read) (writes @ write)
+in (f lst [] []);;
 
 
+let rec boxHandler body param reads writes = 
+	let f expr = (boxHandler expr param reads writes) in
+	let f2 lst = let (reads_, writes_) = appendReadWrites (List.map f lst) in (param, reads_, writes_) in
+	match body with
+	| Const'(expr) -> (param, reads, writes)
+	| Var'(VarFree(expr)) -> (param, reads, writes)
+	| Var'(VarParam(expr, pos)) -> if (compare expr param) == 0 then (param, reads @ [counter], writes) else (param, reads, writes)
+	| Var'(VarBound(expr, major, minor)) -> if ((compare expr param) == 0 && major == 0) then (param,reads @ [counter], writes) else (param,reads, writes)
+	| If' (test ,dit , dif) -> (f2 [test;dit;dif])
+	| Seq' (lst) -> (f2 lst)
+	| Set' (variable, value) -> let (param, reads_val, writes_val) = (f value) in (param, reads_val, (writes_val @ [counter])) 
+	| Def' (variable, value) -> (f2 [variable;value])
+	| Or' (lst) -> (f2 lst)
+	| LambdaSimple' (params, inner_body) -> ignore(counter = counter + 1) ; let boxed_body = box_set (LambdaSimple' (params, inner_body)) in  f boxed_body
+	(* to do: check ignore !!!!!!! *)
+	| LambdaOpt' (params, opt ,inner_body) ->  ignore (counter = counter + 1); let boxed_body = box_set (LambdaOpt' (params, opt, inner_body)) in  f boxed_body
+	| Applic' (expr, args) -> f2 ([expr] @ args)
+	| ApplicTP'(expr, args)-> f2 ([expr] @ args)
+	| Box'(variable) -> (param,reads, writes)
+    | BoxGet'(variable) -> (param,reads, writes)
+    | BoxSet'(variable, expr) -> (param,reads, writes)
 
-let lambdaBoxHandler body params = 
-	let f param = (boxHandler body param) in
- 	List.map f params;;
 
-
-let box_set e = match e with 
+and boxBody body namesToBox = 
+	let f expr = boxBody expr namesToBox in match body with
 	| Const'(expr) -> Const'(expr)
-	| Var'(name) -> Var'(name)
-	| If' (test ,dit , dif) -> If' ((box_set test),(box_set dit) ,(box_set dif))
-	| Seq' (lst) -> Seq' (List.map box_set lst)
-	| Set' (variable, value) -> Set' ((box_set variable), (box_set value))
-	| Def' (variable, value) -> Def' ((box_set variable), (box_set value))
-	| Or' (lst) -> Or' ((List.map box_set lst))
-	| LambdaSimple' (params, body) -> LambdaSimple' (params, (lambdaBoxHandler body params))
-	| LambdaOpt' (params, opt ,body) -> LambdaOpt' (params, opt, (lambdaBoxHandler body (params @[opt]) ))
-	| Applic' (expr, args) -> Applic' ((box_set expr),(List.map box_set args))
-	| ApplicTP'(expr, args)-> ApplicTP' ((box_set expr),(List.map box_set args))
+	| Var'(VarFree(expr)) -> Var'(VarFree(expr))
+	| Var'(VarParam(name, pos)) -> if (List.mem name namesToBox) then BoxGet'(VarParam(name, pos)) else Var'(VarParam(name, pos))
+	| Var'(VarBound(name, major, minor)) -> if (List.mem name namesToBox) then BoxGet'(VarBound(name, major, minor)) else Var'(VarBound(name, major, minor))
+	| If' (test ,dit , dif) -> If'( (f test), (f dit), (f dif))
+	| Seq' (lst) -> Seq'(List.map f lst)
+	| Set' (Var'(variable), value) -> if (List.mem (getVarName variable) namesToBox) then BoxSet'(variable, value) else Set'(Var'(variable), value)
+	| Def' (Var'(variable), value) -> let newNamesToBox = (diff namesToBox [(getVarName variable)]) in Def'(Var'(variable), (boxBody value newNamesToBox))
+	| Or' (lst) -> Or'(List.map f lst)
+	| LambdaSimple' (params, inner_body) -> let newVarsToBox = (diff namesToBox params) in LambdaSimple' (params, (boxBody inner_body newVarsToBox))
+	(* attention! - newVarsToBox take care of shadowing variables in nested lambdas *)
+	| LambdaOpt' (params, opt ,inner_body) ->   let newVarsToBox = (diff namesToBox (params @ [opt])) in LambdaOpt' (params, opt, (boxBody inner_body newVarsToBox))
+	| Applic' (expr, args) -> Applic'((f expr),(List.map f args))
+	| ApplicTP'(expr, args)-> ApplicTP'((f expr),(List.map f args))
+	| Box'(variable) -> Box'(variable)
+    | BoxGet'(variable) -> BoxGet'(variable)
+    | BoxSet'(variable, expr) -> BoxSet'(variable, expr)
+	| _ -> raise X_syntax_error
+
+and generateSetStatement name minor = Set'(Var'(VarParam(name, minor)), Box'(VarParam(name, minor))) 
+
+and lambdaBoxHandler body params = 
+	let f param = (boxHandler body param [] [] ) in (*check if box is needed *)
+ 	let f2 threesome = match threesome with
+ 		| (name, reads, writes) -> let guard = isBoxNeeded (cartesian reads writes) in if guard then name else "" in
+ 	let f4 nameToBox = (generateSetStatement nameToBox (getElementIndex nameToBox params)) in
+ 	let readWritesLists = List.map f params in (*list of pairs of reads and writes for each param - [(n,[1;2],[3;4;5]); (u,[4;5],[])] *)
+	let namesToBox = List.map f2 readWritesLists in
+	let filteredNames = List.filter (function(x) -> x != "") namesToBox in
+	let boxedBody = boxBody body filteredNames in 
+	Seq'((List.map f4 filteredNames) @ [boxedBody])
+
+and box_set e =  match e with 
+	| Const'(expr) -> print_string ("hi"); Const'(expr)
+	| Var'(name) -> print_string ("hi"); Var'(name)
+	| If' (test ,dit , dif) -> print_string ("hi"); If' ((box_set test),(box_set dit) ,(box_set dif))
+	| Seq' (lst) -> print_string ("hi"); Seq' (List.map box_set lst)
+	| Set' (variable, value) -> print_string ("hi"); Set' ((box_set variable), (box_set value))
+	| Def' (variable, value) -> print_string ("hi"); Def' ((box_set variable), (box_set value))
+	| Or' (lst) -> print_string ("hi"); Or' ((List.map box_set lst))
+	| LambdaSimple' (params, body) -> print_string ("hi"); LambdaSimple' (params, (lambdaBoxHandler body params))
+	| LambdaOpt' (params, opt ,body) -> print_string ("hi"); LambdaOpt' (params, opt, (lambdaBoxHandler body (params @[opt]) ))
+	| Applic' (expr, args) -> print_string ("hi"); Applic' ((box_set expr),(List.map box_set args))
+	| ApplicTP'(expr, args)->print_string ("hi");  ApplicTP' ((box_set expr),(List.map box_set args))
 	| _ -> raise X_syntax_error;;
 	(*todo: maybe add box *)
 
@@ -247,6 +330,7 @@ print_expr = fun exprObj ->
     | LambdaSimple'(args,body) -> Printf.sprintf "LambdaSimple(%s,%s)" (print_strings_as_list args) (print_expr body)
     | LambdaOpt'(args,option_arg,body) -> Printf.sprintf "LambdaOpt(%s,%s,%s)" (print_strings_as_list args) option_arg (print_expr body)
     | Applic'(proc,params) -> Printf.sprintf "Applic(%s,%s)" (print_expr proc) (print_exprs_as_list params) 
+    | ApplicTP'(proc,params) -> Printf.sprintf "ApplicTP(%s,%s)" (print_expr proc) (print_exprs_as_list params) 
     | _ -> raise X_syntax_error
 
 and 
@@ -277,6 +361,10 @@ print_strings_as_list = fun stringList ->
   let stringList = print_strings stringList in
     "[ " ^ stringList ^ " ]";;
 
-
+(box_set (annotate_tail_calls (annotate_lexical_addresses (tag_parse_expression (read_sexpr "
+          (define foo1 (lambda (x)
+                          (list (lambda () x)
+                                (lambda (y) 
+                                  (set! x y)))))")))));;
 
 end;; (* struct Semantics *)
