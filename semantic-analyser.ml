@@ -7,10 +7,6 @@
 #use "tag-parser.ml";;
 
 
-open Tag_Parser;;
-open Reader;; 
-(*delete this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! *)
-
 type var = 
   | VarFree of string
   | VarParam of string * int
@@ -72,6 +68,15 @@ end;;
 
 module Semantics : SEMANTICS = struct
 
+(* ************************    Utilities ****************************************************************** *)
+(* returns pair of last element and the rest *)
+let separateList lst = 
+	let reversed = (List.rev lst) in
+	let last = (List.hd reversed) in
+	let rest = (List.rev (List.tl reversed)) in
+	(last, rest);;
+
+
 let varLocInEnv env variable = 
 	let rec getInd i env = 
 		match env with 
@@ -119,8 +124,8 @@ match expr with
 	| Var (name)-> (varHandler name paramsEnv boundEnv )
 	| If (test ,dit , dif) -> If' ((applyRec test),(applyRec dit) ,(applyRec dif))
 	| Seq (lst) -> Seq' (List.map applyRec lst)
-	| Set (value, variable) -> Set' ((applyRec value), (applyRec variable))
-	| Def (value, variable) -> Def' ((applyRec value), (applyRec variable))
+	| Set (variable, value) -> Set' ((applyRec variable), (applyRec value))
+	| Def (variable, value) -> Def' ((applyRec variable), (applyRec value))
 	| Or (lst) -> Or' (List.map applyRec lst)
 	| LambdaSimple (params, body) -> LambdaSimple' (params, (lambdaBodyHandler body params ((makeBoundEnv paramsEnv) @(List.map premoteBoundVar boundEnv) )))
 	| LambdaOpt (params, opt,body) -> LambdaOpt' (params, opt, (lambdaBodyHandler body (params @[opt]) ((makeBoundEnv paramsEnv) @(List.map premoteBoundVar boundEnv) )))
@@ -131,19 +136,67 @@ let rec annotate e = match e with
 	| Var(name) -> Var'(VarFree(name))
 	| If (test ,dit , dif) -> If' ((annotate test),(annotate dit) ,(annotate dif))
 	| Seq (lst) -> Seq' (List.map annotate lst)
-	| Set (value, variable) -> Set' ((annotate value), (annotate variable))
-	| Def (value, variable) -> Def' ((annotate value), (annotate variable))
+	| Set (variable, value) -> Set' ((annotate variable), (annotate value))
+	| Def (variable, value) -> Def' ((annotate variable), (annotate value))
 	| Or (lst) -> Or' ((List.map annotate lst))
 	| LambdaSimple (params, body) -> LambdaSimple' (params, (lambdaBodyHandler body params []))
-	| LambdaOpt (params, opt ,body) -> LambdaOpt' (params, opt, (annotate body))
+	| LambdaOpt (params, opt ,body) -> LambdaOpt' (params, opt, (lambdaBodyHandler body (params @[opt]) []))
 	| Applic (expr, args) -> Applic' ((annotate expr),(List.map annotate args));;
 
 let annotate_lexical_addresses e = annotate e;;
-	
 
-let annotate_tail_calls e = raise X_not_yet_implemented;;
 
-let box_set e = raise X_not_yet_implemented;;
+let rec tail_calls e isTail = match e with
+	| Const'(expr) -> Const'(expr)
+	| Var'(name) -> Var'(name)
+	| If' (test ,dit , dif) -> If' ((tail_calls test false),(tail_calls dit isTail) ,(tail_calls dif isTail))
+	| Seq' (lst) ->  Seq'(seqOrHandler lst isTail)
+	| Set' (variable, value) -> Set' ((tail_calls variable false), (tail_calls value false))
+	| Def' (variable, value) -> Def' ((tail_calls variable false), (tail_calls value false))
+	| Or' (lst) -> Or' (seqOrHandler lst isTail)
+	| LambdaSimple' (params, body) -> LambdaSimple' (params, (tail_calls body true))
+	| LambdaOpt' (params, opt ,body) -> LambdaOpt' (params, opt, (tail_calls body true))
+	| Applic' (app, args) -> (applicHandler app args isTail)
+	| _ -> raise X_syntax_error
+
+and seqOrHandler lst isTail= 
+	let (last,rest) = separateList lst in 
+	let f exp = tail_calls exp false in 
+	((List.map f rest) @ [tail_calls last isTail])
+
+and applicHandler app args isTail=
+ let f exp = tail_calls exp false in
+ if isTail 
+ 	then ApplicTP'((f app),(List.map f args)) (*check if false is correct for app expr *)
+ 	else Applic'((f app),(List.map f args));;
+
+
+let annotate_tail_calls e = tail_calls e false;;
+
+let boxHandler body param = 
+
+
+
+let lambdaBoxHandler body params = 
+	let f param = (boxHandler body param) in
+ 	List.map f params;;
+
+
+let box_set e = match e with 
+	| Const'(expr) -> Const'(expr)
+	| Var'(name) -> Var'(name)
+	| If' (test ,dit , dif) -> If' ((box_set test),(box_set dit) ,(box_set dif))
+	| Seq' (lst) -> Seq' (List.map box_set lst)
+	| Set' (variable, value) -> Set' ((box_set variable), (box_set value))
+	| Def' (variable, value) -> Def' ((box_set variable), (box_set value))
+	| Or' (lst) -> Or' ((List.map box_set lst))
+	| LambdaSimple' (params, body) -> LambdaSimple' (params, (lambdaBoxHandler body params))
+	| LambdaOpt' (params, opt ,body) -> LambdaOpt' (params, opt, (lambdaBoxHandler body (params @[opt]) ))
+	| Applic' (expr, args) -> Applic' ((box_set expr),(List.map box_set args))
+	| ApplicTP'(expr, args)-> ApplicTP' ((box_set expr),(List.map box_set args))
+	| _ -> raise X_syntax_error;;
+	(*todo: maybe add box *)
+
 
 let run_semantics expr =
   box_set
@@ -223,7 +276,6 @@ and
 print_strings_as_list = fun stringList ->
   let stringList = print_strings stringList in
     "[ " ^ stringList ^ " ]";;
-
 
 
 

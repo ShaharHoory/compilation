@@ -394,7 +394,5 @@ let tag_parse_expressions sexpr = tag_parse_expressions_helper sexpr ;;
 	 
 
 
-print_string (print_sexpr (expand_MITdefine (Pair(Symbol "define", Pair(Pair(Symbol "func", Pair(Symbol "a", Pair(Symbol "b", Nil))), Pair(Pair(Symbol "if", Pair(Number (Int 5), Pair(Number (Int 4), Pair(Number (Int 3), Nil)))),Nil))))));;
-
 end;; (* struct Tag_Parser *)
 

@@ -179,7 +179,7 @@ let annotate_test = [(1, a1); (2, a2); (3, a3); (4, a4); (5, a5); (6, a6); (7, a
 (testSum mag "Annotate lexical" annotate_test);;
 (testFailed annotate_test);;
 
-(*
+
 (* Tail calls tests *)
 let t1 = expr'_eq (annotate_tail_calls(annotate_lexical_addresses (tag_parse_expression (read_sexpr 
 "(lambda (x) (f (g (g x))))")))) (  LambdaSimple' (["x"],
@@ -286,7 +286,7 @@ let tailcalls_test = [(1, t1); (2, t2); (3, t3); (4, t4); (5, t5); (6, t6); (7, 
 (testSum cyan "Tail calls" tailcalls_test);;
 (testFailed tailcalls_test);;
 
-
+(*
 (* Box set tests *)
 let b1 = (expr'_eq (run_semantics (tag_parse_expression (read_sexpr "
           (define foo1 (lambda (x)
