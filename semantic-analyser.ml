@@ -7,8 +7,6 @@
 
 #use "reader.ml";;
 #use "tag-parser.ml";;
-open Reader
-open Tag_Parser
 
 
 type var = 
@@ -408,15 +406,5 @@ let run_semantics expr =
        (annotate_lexical_addresses expr));;
 
 
-print_string (print_expr (box_set (annotate_tail_calls
-       (annotate_lexical_addresses (tag_parse_expression (read_sexpr "
-
-    (lambda (x)
-      (lambda ()
-        (lambda () (set! x 4))
-        (lambda ()  x)
-      )
-)" ))))));;
-print_string "\n";; 
 
 end;; (* struct Semantics *)
