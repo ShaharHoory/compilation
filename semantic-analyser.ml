@@ -306,23 +306,37 @@ let appendReadWrites lst =
 	| (param, read,write) :: tail ->  f tail (reads @ read) (writes @ write)
 in (f lst [] []);;
 
+let rec checkBodyReadWrites inner_body params param reads writes f localCounter= 
+    let boxed_inner_body = lambdaBoxHandler inner_body params in 
+    if (List.mem param params) 
+        then (param, reads, writes) 
+    else 
+        let (name, body_reads, body_writes) = (f boxed_inner_body) in 
+        let toRetReads = ref reads in
+        let toRetWrites = ref writes in
+            if (List.length body_reads >0) then 
+                toRetReads := !toRetReads @ [localCounter]; 
+            if (List.length body_writes >0) then 
+                toRetWrites := !toRetWrites @ [localCounter];
+            (param, !toRetReads, !toRetWrites)
+
+
 (*params:[x] body: (LambdaSimple([  ],VarBound("x" 0 0)) reads [] writes []*)
-let rec boxHandler body param reads writes =(* print_string "entered boxHandler\n";*)
-	let f expr = (boxHandler expr param reads writes) in
+and boxHandler body param reads writes localCounter =(* print_string "entered boxHandler\n";*)
+	let f expr = (boxHandler expr param reads writes localCounter) in
 	let f2 lst = let (reads_, writes_) = appendReadWrites (List.map f lst) in (param, reads_, writes_) in
 	match body with
 	| Const'(expr) -> (param, reads, writes)
 	| Var'(VarFree(expr)) -> (param, reads, writes)
-	| Var'(VarParam(expr, pos)) -> if (compare expr param) == 0 then (param, reads @ [!counter], writes) else (param, reads, writes)
-	| Var'(VarBound(expr, major, minor)) -> if ((compare expr param) == 0 (*&& major == 0*)) then (param,reads @ [!counter], writes) else (param,reads, writes)
+	| Var'(VarParam(expr, pos)) -> if (compare expr param) == 0 then (param, [-1], writes) else (param, reads, writes)
+	| Var'(VarBound(expr, major, minor)) -> if ((compare expr param) == 0 (*&& major == 0*)) then (param,[-1], writes) else (param,reads, writes)
 	| If' (test ,dit , dif) -> (f2 [test;dit;dif])
 	| Seq' (lst) -> (f2 lst)
-	| Set' (Var'(variable), value) ->  let (param, reads_val, writes_val) = (f value) in if (compare (getVarName variable) param) == 0 then (param, reads_val, (writes_val @ [!counter]))  else (param, reads_val, writes_val) 
+	| Set' (Var'(variable), value) ->  let (param, reads_val, writes_val) = (f value) in if (compare (getVarName variable) param) == 0 then (param, reads_val, [-1])  else (param, reads_val, writes_val) 
 	| Def' (variable, value) -> (f2 [variable;value])
 	| Or' (lst) -> (f2 lst)
-	| LambdaSimple' (params, inner_body) -> counter := !counter + 1; let boxed_inner_body = lambdaBoxHandler inner_body params in if (List.mem param params) then (param, reads, writes) else (f boxed_inner_body);
-	(* to do: check ignore !!!!!!! *)
-	| LambdaOpt' (params, opt ,inner_body) ->  counter :=  !counter + 1; let boxed_inner_body = lambdaBoxHandler inner_body (params@[opt]) in if (List.mem param (params@[opt])) then (param, reads, writes) else (f boxed_inner_body)
+	| LambdaSimple' (params, inner_body) -> counter := !counter + 1; (checkBodyReadWrites inner_body params param reads writes f !counter)
+	| LambdaOpt' (params, opt ,inner_body) ->  counter :=  !counter + 1; (checkBodyReadWrites inner_body (params@[opt]) param reads writes f !counter)
 	| Applic' (expr, args) -> f2 ([expr] @ args)
 	| ApplicTP'(expr, args)-> f2 ([expr] @ args)
 	| Box'(variable) -> (param,reads, writes)
@@ -359,7 +373,7 @@ and generateSetStatement name minor = Set'(Var'(VarParam(name, minor)), Box'(Var
 (*params:[] body: VarBound("x" 0 0)*)
 and lambdaBoxHandler body params = 
 (*print_string "entered lambda_box_handler\n";*)
-	let f param = (boxHandler body param [] [] ) in (*check if box is needed *)
+	let f param = (boxHandler body param [] [] counter) in (*check if box is needed *)
  	let f2 threesome = match threesome with
  		| (name, reads, writes) -> let guard = isBoxNeeded (cartesian reads writes) in if guard then name else "" in
  	let f4 nameToBox = (generateSetStatement nameToBox (getElementIndex nameToBox params)) in
@@ -396,6 +410,7 @@ let run_semantics expr =
 
 print_string (print_expr (box_set (annotate_tail_calls
        (annotate_lexical_addresses (tag_parse_expression (read_sexpr "
+
     (lambda (x)
       (lambda ()
         (lambda () (set! x 4))

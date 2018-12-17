@@ -1,6 +1,8 @@
 
 (*Tests for semantic-analyser.ml*)
 
+
+
 #use "semantic-analyser.ml";;
 
 open Semantics;;
@@ -64,7 +66,7 @@ let _assert num str out =
   try let result = test_str str in
       (if not (expr'_eq result out)
        then raise (X_output_fail result)
-       else print_int num ; Success num)
+       else (print_int num); print_string ("\n"); Success num)
   with
   |X_no_match ->
      (failwith
@@ -91,8 +93,6 @@ _assert 1 " (define t (lambda (x) (lambda () x) (lambda () (set! x 1))))"
         BoxSet' (VarBound ("x", 0, 0), Const' (Sexpr (Number (Int 1)))))]])));;
 
 _assert 2 "(lambda () x)" (LambdaSimple' ([], Var' (VarFree "x")));;
-
-
 
 _assert 3 
 "(lambda (x y) 
@@ -188,24 +188,24 @@ _assert 7
     (lambda (x y)
       (if (set! x (lambda () x y))
           (lambda () (set! y 4))
-          (set! x (lambda () 0))
       )
     )
   )
 )"
 (LambdaSimple' ([],
- LambdaSimple' ([],
-  LambdaSimple' (["x"; "y"],
-   Seq'
-    [Set' (Var' (VarParam ("y", 1)), Box' (VarParam ("y", 1)));
-     If'
-      (Set' (Var' (VarParam ("x", 0)),
-        LambdaSimple' ([],
-         Seq' [Var' (VarBound ("x", 0, 0)); BoxGet' (VarBound ("y", 0, 1))])),
-      LambdaSimple' ([],
-       BoxSet' (VarBound ("y", 0, 1), Const' (Sexpr (Number (Int 4))))),
-      Set' (Var' (VarParam ("x", 0)),
-       LambdaSimple' ([], Const' (Sexpr (Number (Int 0))))))]))));;
+  LambdaSimple' ([],
+   LambdaSimple' (["x"; "y"],
+    Seq'
+     [Set' (Var' (VarParam ("x", 0)), Box' (VarParam ("x", 0)));
+      Set' (Var' (VarParam ("y", 1)), Box' (VarParam ("y", 1)));
+      If'
+       (BoxSet' (VarParam ("x", 0),
+         LambdaSimple' ([],
+          Seq'
+           [BoxGet' (VarBound ("x", 0, 0)); BoxGet' (VarBound ("y", 0, 1))])),
+       LambdaSimple' ([],
+        BoxSet' (VarBound ("y", 0, 1), Const' (Sexpr (Number (Int 4))))),
+       Const' Void)]))));;
 
 _assert 8
 "(lambda (x y)
@@ -370,4 +370,61 @@ _assert 13
         [Var' (VarParam ("x", 0)); Const' (Sexpr (Number (Int 3)))]));
       Var' (VarParam ("x", 0))])]);;
 
-      
+_assert 14
+"(lambda (x y z)
+  (lambda (z x y)
+    (lambda (y z x)
+      (set! x x)
+      (begin x x x)
+    )
+    (lambda () (set! x x))
+    x
+  )
+  (lambda () (lambda () x))
+  (set! x 0)
+)"
+
+(LambdaSimple' (["x"; "y"; "z"],
+  Seq'
+   [Set' (Var' (VarParam ("x", 0)), Box' (VarParam ("x", 0)));
+    Seq'
+     [LambdaSimple' (["z"; "x"; "y"],
+       Seq'
+        [Set' (Var' (VarParam ("x", 1)), Box' (VarParam ("x", 1)));
+         Seq'
+          [LambdaSimple' (["y"; "z"; "x"],
+            Seq'
+             [Set' (Var' (VarParam ("x", 2)), Var' (VarParam ("x", 2)));
+              Seq'
+               [Var' (VarParam ("x", 2)); Var' (VarParam ("x", 2));
+                Var' (VarParam ("x", 2))]]);
+           LambdaSimple' ([],
+            BoxSet' (VarBound ("x", 0, 1), BoxGet' (VarBound ("x", 0, 1))));
+           BoxGet' (VarParam ("x", 1))]]);
+      LambdaSimple' ([], LambdaSimple' ([], BoxGet' (VarBound ("x", 1, 0))));
+      BoxSet' (VarParam ("x", 0), Const' (Sexpr (Number (Int 0))))]]));;
+
+_assert 15
+"(lambda (x)
+  (set! x
+    (lambda ()
+      (set! x
+        (lambda()
+          (set! x
+            (lambda () x)
+          ) 
+        )
+      )
+    )
+  )
+)"
+
+(LambdaSimple' (["x"],
+  Seq'
+   [Set' (Var' (VarParam ("x", 0)), Box' (VarParam ("x", 0)));
+    BoxSet' (VarParam ("x", 0),
+     LambdaSimple' ([],
+      BoxSet' (VarBound ("x", 0, 0),
+       LambdaSimple' ([],
+        BoxSet' (VarBound ("x", 1, 0),
+         LambdaSimple' ([], BoxGet' (VarBound ("x", 2, 0))))))))]));;
