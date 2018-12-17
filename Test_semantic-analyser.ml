@@ -64,7 +64,7 @@ let _assert num str out =
   try let result = test_str str in
       (if not (expr'_eq result out)
        then raise (X_output_fail result)
-       else Success num)
+       else print_int num ; Success num)
   with
   |X_no_match ->
      (failwith
@@ -79,7 +79,7 @@ let _assert num str out =
      (failwith
 	(Printf.sprintf
 	   "Failed %d with X_syntax_error: Tag parser failed to resolve expression '%s'"num str));;
-(*
+
 _assert 1 " (define t (lambda (x) (lambda () x) (lambda () (set! x 1))))"
 (Def' (Var' (VarFree "t"),
   LambdaSimple' (["x"],
@@ -89,10 +89,10 @@ _assert 1 " (define t (lambda (x) (lambda () x) (lambda () (set! x 1))))"
       [LambdaSimple' ([], BoxGet' (VarBound ("x", 0, 0)));
        LambdaSimple' ([],
         BoxSet' (VarBound ("x", 0, 0), Const' (Sexpr (Number (Int 1)))))]])));;
-*)
+
 _assert 2 "(lambda () x)" (LambdaSimple' ([], Var' (VarFree "x")));;
 
-(*
+
 
 _assert 3 
 "(lambda (x y) 
@@ -370,4 +370,4 @@ _assert 13
         [Var' (VarParam ("x", 0)); Const' (Sexpr (Number (Int 3)))]));
       Var' (VarParam ("x", 0))])]);;
 
-      *)
+      

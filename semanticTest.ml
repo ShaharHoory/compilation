@@ -545,8 +545,8 @@ let b15 = expr'_eq (run_semantics (tag_parse_expression (read_sexpr "
                       LambdaSimple' ([],
                        BoxSet' (VarBound ("w", 0, 3), Const' (Sexpr (Number (Int 3)))))])])));;
 
-let boxSet_test = [(1, b1); (*(2, b2); (3, b3); (4, b4); (5, b5); (6, b6); (7, b7); (8, b8); (9, b9); (10, b10); (11, b11); 
-                   (12, b12); (13, b13); (14, b14); (15, b15)*)];;
+let boxSet_test = [(1, b1); (2, b2); (3, b3); (4, b4); (5, b5); (6, b6); (7, b7); (8, b8); (9, b9); (10, b10); (11, b11); 
+                   (12, b12); (13, b13); (14, b14); (15, b15)];;
 (testSum purple "Box set" boxSet_test);;
 (testFailed boxSet_test);;
 

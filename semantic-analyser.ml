@@ -314,15 +314,15 @@ let rec boxHandler body param reads writes =(* print_string "entered boxHandler\
 	| Const'(expr) -> (param, reads, writes)
 	| Var'(VarFree(expr)) -> (param, reads, writes)
 	| Var'(VarParam(expr, pos)) -> if (compare expr param) == 0 then (param, reads @ [!counter], writes) else (param, reads, writes)
-	| Var'(VarBound(expr, major, minor)) -> if ((compare expr param) == 0 && major == 0) then (param,reads @ [!counter], writes) else (param,reads, writes)
+	| Var'(VarBound(expr, major, minor)) -> if ((compare expr param) == 0 (*&& major == 0*)) then (param,reads @ [!counter], writes) else (param,reads, writes)
 	| If' (test ,dit , dif) -> (f2 [test;dit;dif])
 	| Seq' (lst) -> (f2 lst)
 	| Set' (Var'(variable), value) ->  let (param, reads_val, writes_val) = (f value) in if (compare (getVarName variable) param) == 0 then (param, reads_val, (writes_val @ [!counter]))  else (param, reads_val, writes_val) 
 	| Def' (variable, value) -> (f2 [variable;value])
 	| Or' (lst) -> (f2 lst)
-	| LambdaSimple' (params, inner_body) -> counter := !counter + 1; let boxed_inner_body = lambdaBoxHandler inner_body params in f boxed_inner_body
+	| LambdaSimple' (params, inner_body) -> counter := !counter + 1; let boxed_inner_body = lambdaBoxHandler inner_body params in if (List.mem param params) then (param, reads, writes) else (f boxed_inner_body);
 	(* to do: check ignore !!!!!!! *)
-	| LambdaOpt' (params, opt ,inner_body) ->  counter :=  !counter + 1; let boxed_inner_body = lambdaBoxHandler inner_body (params@[opt]) in f boxed_inner_body
+	| LambdaOpt' (params, opt ,inner_body) ->  counter :=  !counter + 1; let boxed_inner_body = lambdaBoxHandler inner_body (params@[opt]) in if (List.mem param (params@[opt])) then (param, reads, writes) else (f boxed_inner_body)
 	| Applic' (expr, args) -> f2 ([expr] @ args)
 	| ApplicTP'(expr, args)-> f2 ([expr] @ args)
 	| Box'(variable) -> (param,reads, writes)
@@ -369,7 +369,7 @@ and lambdaBoxHandler body params =
 	let filteredNames = List.filter (function(x) -> (compare x "") != 0) namesToBox in
 	(*print_string "\n filtered names(vars to box): ";printStringList filteredNames; print_string "\n";  
 	printIsEmptyList filteredNames;*)
-	if (List.length filteredNames == 0) then body else let boxedBody = boxBody body filteredNames in Seq'((List.map f4 filteredNames) @ [boxedBody])
+	if (List.length filteredNames == 0) then (box_set body) else let boxedBody = boxBody body filteredNames in Seq'((List.map f4 filteredNames) @ [boxedBody])
 
 and box_set e =
 match e with 
@@ -393,13 +393,15 @@ let run_semantics expr =
     (annotate_tail_calls
        (annotate_lexical_addresses expr));;
 
-(*
-(print_string (print_expr (run_semantics (tag_parse_expression (read_sexpr "
-           (define foo5
-                (lambda (x y)
-                  (list (lambda () 
-                          (set! x (+ x 1)))
-                    (lambda () y))))" )))));;
-print_string "\n";;
-*)
+
+print_string (print_expr (box_set (annotate_tail_calls
+       (annotate_lexical_addresses (tag_parse_expression (read_sexpr "
+    (lambda (x)
+      (lambda ()
+        (lambda () (set! x 4))
+        (lambda ()  x)
+      )
+)" ))))));;
+print_string "\n";; 
+
 end;; (* struct Semantics *)
