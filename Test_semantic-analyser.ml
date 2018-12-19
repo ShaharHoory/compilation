@@ -13,8 +13,6 @@ open PC;;
 
 (* Compare expr', add support for Box *)
 let rec expr'_eq e1 e2 =
-
-
   match e1, e2 with
     | Const' Void, Const' Void -> true
     | Const'(Sexpr s1), Const'(Sexpr s2) -> sexpr_eq s1 s2
