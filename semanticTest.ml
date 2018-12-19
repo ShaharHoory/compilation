@@ -552,7 +552,7 @@ let boxSet_test = [(1, b1); (2, b2); (3, b3); (4, b4); (5, b5); (6, b6); (7, b7)
 
 
 (* All tests *)
-let all_test = annotate_test @ tailcalls_test @ boxSet_test;;
+let all_test = (*annotate_test @ tailcalls_test @ boxSet_test*);;
 (testSum yel "All" all_test);;
 allPassed cyan all_test;;
 
