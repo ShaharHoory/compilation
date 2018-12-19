@@ -360,8 +360,9 @@ and _boolean_parser_ s =
   _packed_ s
 
 and _number_ s =
-  let _packed_ = PC.disj (PC.disj (PC.disj _hex_float _float_) _hex_integer) _integer_  in
-  _packed_ s
+  let numParser = PC.disj (PC.disj (PC.disj _hex_float _float_) _hex_integer) _integer_  in
+  let parser = not_followed_by numParser symbol_parser in
+  parser s
 
 
 and string_parser s =
@@ -437,7 +438,8 @@ and _scientific_notation_ s =
     | Number(Float(b)), Number(Int(e)) -> Number(Float(b *. (10.0 ** float_of_int(e))))
     | Number(Int(b)), Number(Int(e)) -> Number(Float(float_of_int(b) *. (10.0 ** float_of_int(e))))
     | _ -> raise X_no_match) in
-  _packed_ s
+    let parser = not_followed_by _packed_ symbol_parser in
+  parser s
 
 
 

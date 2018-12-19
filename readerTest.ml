@@ -668,7 +668,26 @@ let test_ThreeDots_ = fun () ->
     test 13 (sexpr_eq_as_list (execute_read_sexprs_as_list " ...  (\"...\") ...  [([#\\c . ;...\n #\\d ... [1] ...") (execute_expected_as_list([Pair(String("..."),Nil); Pair(Pair(Pair(Char('c'),Char('d')),Nil),Nil); Pair(Number(Int(1)),Nil)])));
     ;;
 
-let tests =(test_Boolean_:: test_Char_ :: test_Number_ :: test_String_ :: test_Symbol_ :: test_List_ :: test_DottedList_ :: test_Vector_ :: test_Quoted_ :: test_QuasiQuoted_ :: test_Unquoted_:: test_UnquotedSpliced_ :: test_LineComment_ :: test_SexprComment_ :: test_ReadSexpr_ :: test_ReadSexprs_ :: test_SceintificNotation_ :: test_ThreeDots_ :: []);;
+let mayers_tests = fun () ->
+    current_test := "mayers_tests";
+    test 1 (sexpr_eq_as_list (execute_read_sexprs_as_list "0notanumber0") (execute_expected_as_list([Symbol "0notanumber0"])));
+    test 2 (sexpr_eq_as_list (execute_read_sexprs_as_list "(define . (add1 .((lambda (x)
+    (+ x -1/1) . ()))))") (execute_expected_as_list([Pair (Symbol "define", Pair (Symbol "add1", Pair (Pair (Symbol "lambda", Pair (Pair (Symbol "x", Nil), Pair (Pair (Symbol "+", Pair (Symbol "x", Pair (Symbol "-1/1", Nil))), Nil))), Nil)))])));
+    test 3 (sexpr_eq_as_list (execute_read_sexprs_as_list "(-1.0 #;(not really here)2/4...
+") (execute_expected_as_list([Pair (Number (Float (-1.000000)), Pair (Symbol "2/4", Nil))])));
+    test 4 (sexpr_eq_as_list (execute_read_sexprs_as_list "1e2a") (execute_expected_as_list([Symbol "1e2a"])));
+    (*test 5 (sexpr_eq (execute_read_sexpr "(#t \"...\" . #F)") (execute_expected(Pair(Bool(true),Pair(String("..."),Bool(false))))));
+    test 6 (sexpr_eq (execute_read_sexpr "(#t \"...\" . #F) ...") (execute_expected(Pair(Bool(true),Pair(String("..."),Bool(false))))));
+    test 7 (sexpr_eq (execute_read_sexpr "(#t \"...\" . #F) ...") (execute_expected(Pair(Bool(true),Pair(String("..."),Bool(false))))));
+    test 8 (sexpr_eq_as_list (execute_read_sexprs_as_list " ... (\"...\") ... [1]") (execute_expected_as_list([Pair(String("..."),Nil); Pair(Number(Int(1)),Nil)])));
+    test 9 (sexpr_eq_as_list (execute_read_sexprs_as_list "  ... (\"...\") ... [1] ...") (execute_expected_as_list([Pair(String("..."),Nil); Pair(Number(Int(1)),Nil)])));
+    test 10 (sexpr_eq_as_list (execute_read_sexprs_as_list " ...  (\"...\") ... () ... [1] ...") (execute_expected_as_list([Pair(String("..."),Nil); Nil; Pair(Number(Int(1)),Nil)])));
+    test 11 (sexpr_eq_as_list (execute_read_sexprs_as_list " ...  (\"...\") ... (;...\n) ... [1] ...") (execute_expected_as_list([Pair(String("..."),Nil); Nil; Pair(Number(Int(1)),Nil)])));
+    test 12 (sexpr_eq_as_list (execute_read_sexprs_as_list " ...  (\"...\") ...  [#\\c . ;...\n #\\d] ... [1] ...") (execute_expected_as_list([Pair(String("..."),Nil); Pair(Char('c'),Char('d')); Pair(Number(Int(1)),Nil)])));
+    test 13 (sexpr_eq_as_list (execute_read_sexprs_as_list " ...  (\"...\") ...  [([#\\c . ;...\n #\\d ... [1] ...") (execute_expected_as_list([Pair(String("..."),Nil); Pair(Pair(Pair(Char('c'),Char('d')),Nil),Nil); Pair(Number(Int(1)),Nil)])));
+    *);;
+
+let tests =(mayers_tests :: [](*test_Boolean_:: test_Char_ :: test_Number_ :: test_String_ :: test_Symbol_ :: test_List_ :: test_DottedList_ :: test_Vector_ :: test_Quoted_ :: test_QuasiQuoted_ :: test_Unquoted_:: test_UnquotedSpliced_ :: test_LineComment_ :: test_SexprComment_ :: test_ReadSexpr_ :: test_ReadSexprs_ :: test_SceintificNotation_ :: test_ThreeDots_ :: []*));;
 
 
 let rec start_tests = function 
