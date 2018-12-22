@@ -13,11 +13,22 @@ let constant_eq s1 s2 = match s1, s2 with
 	| Void, Void -> true
 	| _ -> false;;
 
-  let removeDuplicatesConstList lst = 
-  	let rec f origList reducedList = match origList with 
+let varFree_eq v1 v2 = match v1,v2 with
+	| VarFree(s1), VarFree(s2) -> if (compare s1 s2 ==0 ) then true else false
+	| _ -> false;;
+
+
+let removeDuplicates lst pred = 
+	let rec f origList reducedList = match origList with 
   		| [] -> reducedList
-  		| car :: cdr -> if (List.exists (fun (sexp) -> constant_eq car sexp) reducedList) then f cdr reducedList  else f cdr (reducedList@[car]) in
+  		| car :: cdr -> if (List.exists (fun (sexp) -> pred car sexp) reducedList) then f cdr reducedList  else f cdr (reducedList@[car]) in
   	f lst [];;
+
+let removeDuplicatesConstList lst = 
+  	removeDuplicates lst constant_eq;;
+
+let removeDuplicatesVarFreeList lst = 
+  	removeDuplicates lst varFree_eq;; 	
 
   (*makes the initial constatnt list -without duplicates- which is gonna be expanded to the consts table*)
   let make_consts_list exprTag_lst = 
@@ -44,6 +55,42 @@ let constant_eq s1 s2 = match s1, s2 with
   let withInitialConstants = [Void;Sexpr(Nil);Sexpr(Bool(false));Sexpr(Bool(true))] @ sexpsList in
 	removeDuplicatesConstList withInitialConstants;;
 
+
+let make_fvars_list exprTag_lst = 
+  	let rec findFreeVarsInExpr' exp' = 
+  		let buildFreeVarList accList =
+		  	match exp' with
+		  		| Const'(x) -> accList
+		  		| Var'(VarFree(x)) -> accList @ [VarFree(x)]
+		  		| Var'(x) -> accList 
+				| Box'(v)-> accList
+				| BoxGet'(v) -> accList
+				| BoxSet'(v, setExp') -> accList @ findFreeVarsInExpr' setExp' 
+				| If' (test, dit, dif) -> accList @ ((findFreeVarsInExpr' test) @ (findFreeVarsInExpr' dit) @ (findFreeVarsInExpr' dif))
+				| Seq'(exprTags) -> accList @ (List.flatten (List.map findFreeVarsInExpr' exprTags))
+				| Set'(var, ex') -> accList @ ((findFreeVarsInExpr' var) @ (findFreeVarsInExpr' ex'))
+				| Def'(var, ex') -> accList @ ((findFreeVarsInExpr' var) @ (findFreeVarsInExpr' ex'))
+				| Or'(exprTags) -> accList @ (List.flatten (List.map findFreeVarsInExpr' exprTags))
+				| LambdaSimple'(params, body) -> accList @ (findFreeVarsInExpr' body)
+				| LambdaOpt'(params, opt, body) -> accList @ (findFreeVarsInExpr' body)
+				| Applic'(proc, argsList) -> accList @ (List.flatten (List.map findFreeVarsInExpr' ([proc] @ argsList)))
+				| ApplicTP'(proc, argsList) ->  accList @ (List.flatten (List.map findFreeVarsInExpr' ([proc] @ argsList))) in
+	buildFreeVarList [] in
+  let freeVarsList = List.flatten (List.map findFreeVarsInExpr' exprTag_lst) in
+  let withInitialfreeVars= [VarFree("car"); VarFree("cdr"); VarFree("map")] @ freeVarsList in
+	removeDuplicatesVarFreeList withInitialfreeVars;;
+
+let undefined = "undefined";;
+let runtimeFrameworkLabels = ["car";"cdr"; "map"];;
+let make_fvars_tbl_helper fvarsList = 
+	let rec f lst i = match lst with
+		| VarFree(head) :: tail -> if (List.mem head runtimeFrameworkLabels) then let pred x = (compare head x) ==0 in [(head,i,List.find pred runtimeFrameworkLabels)] @ (f tail (i+1)) else [(head, i, undefined)] @ (f tail (i+1))
+		| _ -> []  in
+		f fvarsList 0;;
+
+
+
+
 (*the folding function of expandCOnstList*)
 let rec expandConstant const accResult = match const with
 	| Sexpr(Symbol(str)) -> [Sexpr(String(str));const] @ accResult
@@ -67,10 +114,48 @@ let sizeOfSexpr sexpr = match sexpr with
 let sizeOfConst const = match const with
 	| Void -> 1
 	| Sexpr(s) -> sizeOfSexpr s;;
+
+let rec consts_to_pair lst offset = match lst with
+	| [] -> []
+	| head :: tail -> [(head,offset)] @ (consts_to_pair tail (offset + (sizeOfConst head)));;
+
+
+
+let rec findStringOffset sexprs_offset sexpr = match sexprs_offset with
+	| [] -> -1
+	| (Sexpr(s), index) :: tail -> if (sexpr_eq s sexpr) then index else (findStringOffset tail sexpr)
+	| head :: tail -> (findStringOffset tail sexpr);;
+
+let rec sexpr_to_tuple sexpr offset sexprs_offset= 
+	let toTuple str = (Sexpr(sexpr),offset, str) in match sexpr with 
+	| Nil -> toTuple "MAKE_NIL"
+	| Char(c) -> toTuple ("MAKE_LITERAL_CHAR(\'"^(Char.escaped c)^"\')")
+	| Bool(b) -> if b then toTuple "MAKE_BOOL(1)" else toTuple "MAKE_BOOL(0)"
+	| Number(Int(a)) -> toTuple ("MAKE_LITERAL_INT("^(string_of_int a)^")")
+	| Number(Float(a)) -> toTuple ("MAKE_LITERAL_FLOAT("^(string_of_float a)^")") (*TODO:: check this!! *)
+	| String(str) -> toTuple ("MAKE_LITERAL_STRING(\""^str^"\")")
+	| Symbol(s) -> toTuple ("MAKE_LITERAL_SYMBOL(consts+"^(string_of_int (findStringOffset sexprs_offset (String s)))^")")
+	| Vector(lst) -> toTuple "MAKE_LITERAL_VECTOR" (*not implemented yet*)
+	| Pair(car, cdr) -> toTuple ("MAKE_LITERAL(consts+" ^(string_of_int (findStringOffset sexprs_offset car))^ ", consts+"^(string_of_int (findStringOffset sexprs_offset cdr))^")") ;;(*not implemented yet *)
+
+let rec const_to_tuple const offset sexprs_offset = 
+	match const with 
+	| Void -> (Void, 0, "MAKE_VOID")
+	| Sexpr (x) -> (sexpr_to_tuple x offset sexprs_offset);;
+
 (*TODO: complete this using sizeOfSexpr and getOffset(isn't written yet)*)
-(* let populateConstList constList =
-	let first = ((List.hd constList), 0, 
-*)
+ let populateConstList constList =
+ 	let consts_with_offsets = (consts_to_pair constList 0) in 
+ 	let rec consts_to_tuple lst = 
+ 	match lst with 
+ 		| [] -> []
+ 		| (constant,offset) :: tail -> [(const_to_tuple constant offset consts_with_offsets)] @ (consts_to_tuple tail) in
+ 	consts_to_tuple consts_with_offsets;;
+
+
+
+
+
 
 (*---------print functions - only for tests - delete this----------*)
 let rec print_sexpr = fun sexprObj ->
@@ -108,6 +193,15 @@ and print_sexprs_as_list = fun sexprList ->
 and print_consts_as_list = fun constsList ->
   let constString = print_consts constsList in
     "[ " ^ constString ^ " ]"
+
+and print_vars = fun varList ->
+	match varList with
+	| [] -> ""
+	| head:: tail -> (print_var head) ^ ", " ^ (print_vars tail)
+
+and print_varfree_as_list = fun varfreeList ->
+  let varString = print_vars varfreeList in
+    "[ " ^ varString ^ " ]"
 
 and print_expr = fun exprObj ->
   match exprObj  with
@@ -158,18 +252,27 @@ print_strings = fun stringList ->
 
 and
 
+
 print_strings_as_list = fun stringList ->
   let stringList = print_strings stringList in
     "[ " ^ stringList ^ " ]";;
 
+let rec printThreesomesList lst =
+  match lst with
+    | [] -> ()
+    | (name, index, str)::cdr -> print_string (print_const name); print_string " , "; print_int index ; print_string (" "^str^" \n"); printThreesomesList cdr;;
+
+
 (*Mayers main functions*)
 let make_consts_tbl asts = raise X_not_yet_implemented (*populateConstList(expandConstList (make_consts_list asts))*);;
+
 let make_fvars_tbl asts = raise X_not_yet_implemented;;
+
 let generate consts fvars e = raise X_not_yet_implemented;;
 
 (*Tests*)
 (* - make_const_list test *)
-
+(*
 (print_string (print_consts_as_list (make_consts_list [Applic' (LambdaSimple' (["x"], Seq' ([Set' (Var' (VarParam ("x", 0)), Box' (VarParam ("x", 0)));If' (Applic' (BoxGet' (VarParam ("x", 0)), [Const' (Sexpr (Number (Int (1))))]), ApplicTP' (BoxGet' (VarParam ("x", 0)), [Const' (Sexpr (Number (Int (2))))]), ApplicTP' (LambdaSimple' (["x"], Set' (Var' (VarParam ("x", 0)), Const' (Sexpr (Number (Int (0)))))), 
                                [Const' (Sexpr (Number (Int (3))))]))])), [LambdaSimple' (["x"], Var' (VarParam ("x", 0))) ; LambdaSimple' ([], Const' (Sexpr (Number (Int (1)))))])])));;
 (print_string "\n");;
@@ -196,7 +299,12 @@ let generate consts fvars e = raise X_not_yet_implemented;;
       Pair (Symbol "quote",
        Pair (Pair (Number (Int 5), Pair (Number (Int 6), Nil)), Nil))]))]))));;
 (print_string "\n");;
+*)
 
+printThreesomesList (populateConstList(expandConstList (make_consts_list  [Applic' (Var' (VarFree "list"),
+ [
+   Const'(Sexpr(Pair(Number(Int 1),Pair(Number(Int 2),Nil))));
+   Var'(VarFree "list"); Const' (Sexpr (Symbol "ab"))])])));;
 
 end;;
 
