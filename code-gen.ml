@@ -1,13 +1,5 @@
 #use "semantic-analyser.ml";;
 
-module type CODE_GEN = sig
-  val make_consts_tbl : expr' list -> (constant * ('a * string)) list
-  val make_fvars_tbl : expr' list -> (string * 'a) list
-  val generate : (constant * ('a * string)) list -> (string * 'a) list -> expr' -> string
-end;;
-
-module Code_Gen : CODE_GEN = struct
-
 let constant_eq s1 s2 = match s1, s2 with
 	| Sexpr(s1), Sexpr(s2) -> sexpr_eq s1 s2
 	| Void, Void -> true
@@ -16,6 +8,14 @@ let constant_eq s1 s2 = match s1, s2 with
 let varFree_eq v1 v2 = match v1,v2 with
 	| VarFree(s1), VarFree(s2) -> if (compare s1 s2 ==0 ) then true else false
 	| _ -> false;;
+
+module type CODE_GEN = sig
+  val make_consts_tbl : expr' list -> (constant * (int * string)) list 
+  val make_fvars_tbl : expr' list -> (string * int) list
+  val generate : (constant * ('a * string)) list -> (string * 'a) list -> expr' -> string
+end;;
+
+module Code_Gen : CODE_GEN = struct
 
 
 let removeDuplicates lst pred = 
@@ -80,7 +80,7 @@ let make_fvars_list exprTag_lst =
   let withInitialfreeVars= [VarFree("car"); VarFree("cdr"); VarFree("map")] @ freeVarsList in
 	removeDuplicatesVarFreeList withInitialfreeVars;;
 
-let undefined = "undefined";;
+let undefined = "MAKE_UNDEF";;
 let runtimeFrameworkLabels = ["car";"cdr"; "map"];;
 let make_fvars_tbl_helper fvarsList = 
 	let rec f lst i = match lst with
@@ -127,7 +127,7 @@ let rec findStringOffset sexprs_offset sexpr = match sexprs_offset with
 	| head :: tail -> (findStringOffset tail sexpr);;
 
 let rec sexpr_to_tuple sexpr offset sexprs_offset= 
-	let toTuple str = (Sexpr(sexpr),offset, str) in match sexpr with 
+	let toTuple str = (Sexpr(sexpr),(offset, str)) in match sexpr with 
 	| Nil -> toTuple "MAKE_NIL"
 	| Char(c) -> toTuple ("MAKE_LITERAL_CHAR(\'"^(Char.escaped c)^"\')")
 	| Bool(b) -> if b then toTuple "MAKE_BOOL(1)" else toTuple "MAKE_BOOL(0)"
@@ -140,10 +140,9 @@ let rec sexpr_to_tuple sexpr offset sexprs_offset=
 
 let rec const_to_tuple const offset sexprs_offset = 
 	match const with 
-	| Void -> (Void, 0, "MAKE_VOID")
+	| Void -> (Void, (0, "MAKE_VOID"))
 	| Sexpr (x) -> (sexpr_to_tuple x offset sexprs_offset);;
 
-(*TODO: complete this using sizeOfSexpr and getOffset(isn't written yet)*)
  let populateConstList constList =
  	let consts_with_offsets = (consts_to_pair constList 0) in 
  	let rec consts_to_tuple lst = 
@@ -260,13 +259,13 @@ print_strings_as_list = fun stringList ->
 let rec printThreesomesList lst =
   match lst with
     | [] -> ()
-    | (name, index, str)::cdr -> print_string (print_const name); print_string " , "; print_int index ; print_string (" "^str^" \n"); printThreesomesList cdr;;
+    | (name, (index, str))::cdr -> print_string (print_const name); print_string " , "; print_int index ; print_string (" "^str^" \n"); printThreesomesList cdr;;
 
 
 (*Mayers main functions*)
-let make_consts_tbl asts = raise X_not_yet_implemented (*populateConstList(expandConstList (make_consts_list asts))*);;
+let make_consts_tbl asts = populateConstList(expandConstList (make_consts_list asts));;
 
-let make_fvars_tbl asts = raise X_not_yet_implemented;;
+let make_fvars_tbl asts = raise X_not_yet_implemented;;(*make_fvars_tbl_helper (make_fvars_list asts);;*)
 
 let generate consts fvars e = raise X_not_yet_implemented;;
 
@@ -301,10 +300,12 @@ let generate consts fvars e = raise X_not_yet_implemented;;
 (print_string "\n");;
 *)
 
+(*
 printThreesomesList (populateConstList(expandConstList (make_consts_list  [Applic' (Var' (VarFree "list"),
  [
    Const'(Sexpr(Pair(Number(Int 1),Pair(Number(Int 2),Nil))));
    Var'(VarFree "list"); Const' (Sexpr (Symbol "ab"))])])));;
+*)
 
 end;;
 

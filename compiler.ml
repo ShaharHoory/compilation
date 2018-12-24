@@ -11,7 +11,7 @@ let string_to_asts s = List.map Semantics.run_semantics
                             (Reader.read_sexprs s));;
 
 let primitive_names_to_labels = 
-  ["boolean?", "is_boolean"; "float?", "is_float"; "integer?", "is_integer"; "pair?", "is_pair";
+  ["boolean?", "is_boolean"; "float?", "is_float"; "integer?", "is_integer"; "pair?", "is_pair"; (*TODO: add mappings for our library functions implementations*)
    "null?", "is_null"; "char?", "is_char"; "vector?", "is_vector"; "string?", "is_string";
    "procedure?", "is_procedure"; "symbol?", "is_symbol"; "string-length", "string_length";
    "string-ref", "string_ref"; "string-set!", "string_set"; "make-string", "make_string";
@@ -22,8 +22,12 @@ let primitive_names_to_labels =
 (* you can add yours here *)];;
 
 let make_prologue consts_tbl fvars_tbl =
-  let get_const_address const = raise X_not_yet_implemented in
-  let get_fvar_address const = raise X_not_yet_implemented in
+  let get_const_address const = let filtered = List.filter (fun ((c, (addr, representation))) -> constant_eq const c) consts_tbl in   (*filtered =  [(a, (b, c))] *)
+                                  let (a, (addr, b)) = List.hd filtered in
+                                    string_of_int addr in
+  let get_fvar_address constString = let filtered = List.filter (fun ((varName, addr)) -> String.equal constString varName) fvars_tbl in   (*filtered =  [(a, b))] *)
+                                  let (a, addr) = List.hd filtered in
+                                    string_of_int addr in
   let make_primitive_closure (prim, label) =
 "    MAKE_CLOSURE(rax, SOB_NIL_ADDRESS, " ^ label  ^ ")
     mov [" ^ (get_fvar_address prim)  ^ "], rax" in

@@ -201,7 +201,7 @@
 %endrep
 %endmacro
     
-; todo: ADD MAKE_LITERAL_SYMBOL
+; todo: ADD MAKE_LITERAL_SYMBOL & MAKE_UNDEF
     
 ; end macros that Shahar added from the practical session
 extern exit, printf, malloc
