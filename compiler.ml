@@ -22,12 +22,8 @@ let primitive_names_to_labels =
 (* you can add yours here *)];;
 
 let make_prologue consts_tbl fvars_tbl =
-  let get_const_address const = let filtered = List.filter (fun ((c, (addr, representation))) -> constant_eq const c) consts_tbl in   (*filtered =  [(a, (b, c))] *)
-                                  let (a, (addr, b)) = List.hd filtered in
-                                    string_of_int addr in
-  let get_fvar_address constString = let filtered = List.filter (fun ((varName, addr)) -> String.equal constString varName) fvars_tbl in   (*filtered =  [(a, b))] *)
-                                  let (a, addr) = List.hd filtered in
-                                    string_of_int addr in
+  let get_const_address const = get_const_address const consts_tbl in
+  let get_fvar_address constString = get_fvar_address constString fvars_tbl in
   let make_primitive_closure (prim, label) =
 "    MAKE_CLOSURE(rax, SOB_NIL_ADDRESS, " ^ label  ^ ")
     mov [" ^ (get_fvar_address prim)  ^ "], rax" in

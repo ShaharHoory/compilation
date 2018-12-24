@@ -1,5 +1,6 @@
 #use "semantic-analyser.ml";;
 
+(*functions for using also in compiler.ml *)
 let constant_eq s1 s2 = match s1, s2 with
 	| Sexpr(s1), Sexpr(s2) -> sexpr_eq s1 s2
 	| Void, Void -> true
@@ -9,10 +10,20 @@ let varFree_eq v1 v2 = match v1,v2 with
 	| VarFree(s1), VarFree(s2) -> if (compare s1 s2 ==0 ) then true else false
 	| _ -> false;;
 
+let get_const_address const consts_tbl = 
+	let filtered = List.filter (fun ((c, (addr, representation))) -> constant_eq const c) consts_tbl in   (*filtered =  [(a, (b, c))] *)
+        let (a, (addr, b)) = List.hd filtered in
+           string_of_int addr;;
+
+let get_fvar_address constString fvars_tbl = 
+	let filtered = List.filter (fun ((varName, addr)) -> String.equal constString varName) fvars_tbl in   (*filtered =  [(a, b))] *)
+        let (a, addr) = List.hd filtered in
+            string_of_int addr;;
+
 module type CODE_GEN = sig
   val make_consts_tbl : expr' list -> (constant * (int * string)) list 
   val make_fvars_tbl : expr' list -> (string * int) list
-  val generate : (constant * ('a * string)) list -> (string * 'a) list -> expr' -> string
+  val generate : (constant * (int * string)) list -> (string * int) list -> expr' -> string
 end;;
 
 module Code_Gen : CODE_GEN = struct
@@ -267,7 +278,50 @@ let make_consts_tbl asts = populateConstList(expandConstList (make_consts_list a
 
 let make_fvars_tbl asts = raise X_not_yet_implemented;;(*make_fvars_tbl_helper (make_fvars_list asts);;*)
 
-let generate consts fvars e = raise X_not_yet_implemented;;
+let generate consts fvars e = 
+	let rec genCode exp = match exp with
+		| Const'(c) -> "mov rax, " ^ get_const_address c consts (*todo: check this????*)
+	    | Var'(VarParam(_, minor)) -> "mov rax, qword [rbp + 8*(4 + " ^ (string_of_int minor) ^ ")]"
+	    | Set'(Var'(VarParam(_, minor)), exp) -> (genCode exp) ^ "\n" ^
+	    										  "mov qword [rbp + 8*(4 + " ^ (string_of_int minor) ^ ")], rax\n" ^
+	    										  "mov rax, SOB_VOID"
+	    | Var'(VarBound(_, major, minor)) -> "mov rax, qword[rpb + 8*2]\n" ^
+	    									 "mov rax, qword [rax + 8 * " ^ (string_of_int major) ^ "]\n"
+	    									 "mov rax, qword [rax + 8 * " ^ (string_of_int minor) ^ "]"
+		| Set'(VarBound(_, major, minor), exp) -> (genCode exp) ^ "\n" ^
+												  "mov rbx, qword[rpb + 8*2]\n" ^
+												  "mov rbx, qword [rbx + 8 * " ^ (string_of_int major) ^ "]\n"
+												  "mov qword [rbx + 8 * " ^ (string_of_int minor) ^ "], rax\n" ^
+	    										  "mov rax, SOB_VOID"
+	    | Var'(VarFree(x)) -> "mov rax, qword [" ^ (string_of_int(get_fvar_address x fvars)) ^ "]" (*todo: check this????*)
+	    | Set(Var'(VarFree(v)), exp) = (genCode exp) ^ "\n" ^
+	    							   "mov qword [" ^ (string_of_int(get_fvar_address v fvars)) ^ "], rax\n"
+	    							   "mov rax, SOB_VOID"
+	  	| Seq'(lst) -> List.fold_left (fun (acc, expr) -> acc ^ ((genCode expr)^"\n")) "" lst
+	  	| Or'(lst) ->  (List.fold_left (fun (acc, expr) -> acc ^ ((genCode expr)^"\n cmp rax, SOB_FALSE\n jne Lexit\n")) "" lst) ^ "Lexit:"
+	    | If'(test,dit,dif) -> (genCode test) ^ "\n" ^
+	    					   "cmp rax, SOB_FALSE\n" ^
+	    					   "je Lelse\n" ^
+	    					   (genCode dit) ^ "\n" ^
+	    					   "jmp Lexit\n" ^
+	    					   "Lelse:\n" ^
+	    					   (genCode dif) ^ "\n" ^
+	    					   "Lexit:"
+	  	| BoxGet'(Var'(v)) -> (genCode Var'(v)) ^ "\n" ^
+	  						  "mov rax, qword [rax]"
+	    | BoxSet'(Var'(v), expr) -> (genCode expr) ^ "\n" ^
+	    							"push rax\n" ^
+	    							(genCode Var'(v)) ^ "\n" ^
+	    							"pop qword [rax]\n" ^
+	    							"mov rax, SOB_VOID"
+	    | Def'(var,value) -> 
+	    | LambdaSimple'(args,body) -> 
+	    | LambdaOpt'(args,option_arg,body) -> 
+	    | Applic'(proc,params) -> 
+	    | ApplicTP'(proc,params) -> 
+	    (*| Box'(variable) -> check this*) 
+	in
+	genCode e;;
 
 (*Tests*)
 (* - make_const_list test *)
