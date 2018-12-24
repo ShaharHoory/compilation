@@ -53,6 +53,7 @@ fvar_tbl:
 " ^ (String.concat "\n" (List.map (fun _ -> "dq T_UNDEFINED") fvars_tbl)) ^ "
 
 section .text
+global main
 main:
     ;; set up the heap
     mov rdi, GB(4)

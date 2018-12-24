@@ -169,7 +169,41 @@
 %define MAKE_CLOSURE(r, env, body) \
         MAKE_TWO_WORDS r, T_CLOSURE, env, body
 
-	
+; macros that Shahar added from the practical session
+%macro MAKE_LITERAL 2
+    db %1
+    %2
+%endmacro
+
+%define MAKE_LITERAL_INT(val) MAKE_LITERAL T_INTEGER, dq val
+%define MAKE_LITERAL_CHAR(val) MAKE_LITERAL T_CHAR, db val
+%define MAKE_NIL db T_NIL
+%define MAKE_VOID db T_VOID
+%define MAKE_BOOL(val) MAKE_LITERAL T_BOOL, db val
+
+%macro MAKE_LITERAL_STRING 1
+    db T_STRING
+    dq (%%end_str - %%str)
+%%str:
+    db %1
+%%end_str:
+%endmacro
+
+%define MAKE_LITERAL_CLOSURE(body) \
+    MAKE_WORDS_LIT T_CLOSURE, 0, body
+
+%macro MAKE_LITERAL_VECTOR 0-*
+    db T_VECTOR
+    dq %0
+%rep %0
+    dq %1
+%rotate 1
+%endrep
+%endmacro
+    
+; todo: ADD MAKE_LITERAL_SYMBOL
+    
+; end macros that Shahar added from the practical session
 extern exit, printf, malloc
 global write_sob, write_sob_if_not_void
 
