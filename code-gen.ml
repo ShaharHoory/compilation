@@ -106,7 +106,7 @@ let make_fvars_tbl_helper fvarsList =
 let rec expandConstant const accResult = match const with
 	| Sexpr(Symbol(str)) -> [Sexpr(String(str));const] @ accResult
 	| Sexpr(Pair(car, cdr)) -> expandConstant (Sexpr(car)) (expandConstant (Sexpr(cdr)) ([(Sexpr(car));(Sexpr(cdr));const] @ accResult))
-	| Sexpr(Vector(lst)) -> (expandConstList (List.map (fun (a) -> Sexpr(a)) lst)) @ ([const] @ accResult) (*check if this brings the desired output!!!!!!!!!!!!!!!!!!!!!!!!!!1*)
+	| Sexpr(Vector(lst)) -> (expandConstList (List.map (fun (a) -> Sexpr(a)) lst)) @ ([const] @ accResult) (*TODO: check if this brings the desired output!!!!!!!!!!!!!!!!!!!!!!!!!!1*)
 	| _ -> [const] @ accResult
 
 and expandConstList constList = removeDuplicatesConstList (List.fold_right expandConstant constList []);;
@@ -129,8 +129,6 @@ let sizeOfConst const = match const with
 let rec consts_to_pair lst offset = match lst with
 	| [] -> []
 	| head :: tail -> [(head,offset)] @ (consts_to_pair tail (offset + (sizeOfConst head)));;
-
-
 
 let rec findStringOffset sexprs_offset sexpr = match sexprs_offset with
 	| [] -> -1
@@ -286,18 +284,18 @@ let generate consts fvars e =
 	    										  "mov qword [rbp + 8*(4 + " ^ (string_of_int minor) ^ ")], rax\n" ^
 	    										  "mov rax, SOB_VOID"
 	    | Var'(VarBound(_, major, minor)) -> "mov rax, qword[rpb + 8*2]\n" ^
-	    									 "mov rax, qword [rax + 8 * " ^ (string_of_int major) ^ "]\n"
+	    									 "mov rax, qword [rax + 8 * " ^ (string_of_int major) ^ "]\n" ^
 	    									 "mov rax, qword [rax + 8 * " ^ (string_of_int minor) ^ "]"
-		| Set'(VarBound(_, major, minor), exp) -> (genCode exp) ^ "\n" ^
+		| Set'(Var'(VarBound(_, major, minor)), exp) -> (genCode exp) ^ "\n" ^
 												  "mov rbx, qword[rpb + 8*2]\n" ^
-												  "mov rbx, qword [rbx + 8 * " ^ (string_of_int major) ^ "]\n"
+												  "mov rbx, qword [rbx + 8 * " ^ (string_of_int major) ^ "]\n" ^
 												  "mov qword [rbx + 8 * " ^ (string_of_int minor) ^ "], rax\n" ^
 	    										  "mov rax, SOB_VOID"
-	    | Var'(VarFree(x)) -> "mov rax, qword [" ^ (string_of_int(get_fvar_address x fvars)) ^ "]" (*todo: check this????*)
-	    | Set(Var'(VarFree(v)), exp) = (genCode exp) ^ "\n" ^
-	    							   "mov qword [" ^ (string_of_int(get_fvar_address v fvars)) ^ "], rax\n"
+	    | Var'(VarFree(x)) -> "mov rax, qword [" ^ (get_fvar_address x fvars) ^ "]" (*todo: check this????*)
+	    | Set'(Var'(VarFree(v)), exp) -> (genCode exp) ^ "\n" ^
+	    							   "mov qword [" ^ (get_fvar_address v fvars) ^ "], rax\n" ^
 	    							   "mov rax, SOB_VOID"
-	  	| Seq'(lst) -> List.fold_left (fun (acc, expr) -> acc ^ ((genCode expr)^"\n")) "" lst
+| Seq'(lst) -> List.fold_left (fun (acc, expr) -> acc ^ (genCode expr) ^ "\n") "" lst
 	  	| Or'(lst) ->  (List.fold_left (fun (acc, expr) -> acc ^ ((genCode expr)^"\n cmp rax, SOB_FALSE\n jne Lexit\n")) "" lst) ^ "Lexit:"
 	    | If'(test,dit,dif) -> (genCode test) ^ "\n" ^
 	    					   "cmp rax, SOB_FALSE\n" ^
@@ -307,19 +305,32 @@ let generate consts fvars e =
 	    					   "Lelse:\n" ^
 	    					   (genCode dif) ^ "\n" ^
 	    					   "Lexit:"
-	  	| BoxGet'(Var'(v)) -> (genCode Var'(v)) ^ "\n" ^
+	  	| BoxGet'(v) -> (genCode Var'(v)) ^ "\n" ^
 	  						  "mov rax, qword [rax]"
-	    | BoxSet'(Var'(v), expr) -> (genCode expr) ^ "\n" ^
+	    | BoxSet'(v, expr) -> (genCode expr) ^ "\n" ^
 	    							"push rax\n" ^
 	    							(genCode Var'(v)) ^ "\n" ^
 	    							"pop qword [rax]\n" ^
 	    							"mov rax, SOB_VOID"
-	    | Def'(var,value) -> 
-	    | LambdaSimple'(args,body) -> 
-	    | LambdaOpt'(args,option_arg,body) -> 
-	    | Applic'(proc,params) -> 
+		| Applic'(proc,argList) -> applicCodeGen proc argsList
 	    | ApplicTP'(proc,params) -> 
+	    | LambdaSimple'(argNames,body) -> 
+	    | LambdaOpt'(args,option_arg,body) -> 
+	    | Def'(var,value) ->
 	    (*| Box'(variable) -> check this*) 
+	    and applicCodeGen proc argList =
+	    	(List.fold_right (fun (argExpr, acc) -> acc ^ ((genCode argExpr)^"\n push rax\n")) "" lst) ^ (*pushing the args last to first*)
+	    	"push " ^ (string_of_int (List.length argsList)) ^ "\n" ^ (*num of args*)
+	    	(genCode proc) ^ "\n" ^
+	    	"cmp rax, T_CLOSURE\n" ^
+	    	"jne NotAClosure\n" ^
+	    	"push [rax + TYPE_SIZE]\n" (*push env*)
+	    	"push qword [rbp + 8 * 1] ; old ret addr\n" (*: TODO: Check if we need this???*)
+	    	"call [rax + TYPE_SIZE + WORD_BYTES]\n" (*call proc-body*)
+	    	"jmp FinishedApplic\n"
+	    	"NotAClosure:\n"
+	    	(*TODO: what to do when proc isn't a closure??? - replace this line!*)
+	    	"FinishedApplic:\n"
 	in
 	genCode e;;
 
