@@ -39,6 +39,8 @@ malloc_pointer:
     resq 1
 
 section .data
+.notACLosureError:
+	db \"Error: trying to apply not-a-closure\", 0
 const_tbl:
 " ^ (String.concat "\n" (List.map make_constant consts_tbl)) ^ "
 

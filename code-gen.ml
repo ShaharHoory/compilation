@@ -276,6 +276,15 @@ let make_consts_tbl asts = populateConstList(expandConstList (make_consts_list a
 
 let make_fvars_tbl asts = raise X_not_yet_implemented;;(*make_fvars_tbl_helper (make_fvars_list asts);;*)
 
+let orCounter = ref 0;;
+let ifCounter = ref 0;;
+let applicCounter = ref 0;;
+
+let incCounter counterRef = counterRef := !counterRef + 1 ; "";;
+
+let makeNumberedLabel label num = 
+	label ^ (string_of_int num);;
+
 let generate consts fvars e = 
 	let rec genCode exp = match exp with
 		| Const'(c) -> "mov rax, " ^ get_const_address c consts (*todo: check this????*)
@@ -295,42 +304,50 @@ let generate consts fvars e =
 	    | Set'(Var'(VarFree(v)), exp) -> (genCode exp) ^ "\n" ^
 	    							   "mov qword [" ^ (get_fvar_address v fvars) ^ "], rax\n" ^
 	    							   "mov rax, SOB_VOID"
-| Seq'(lst) -> List.fold_left (fun (acc, expr) -> acc ^ (genCode expr) ^ "\n") "" lst
-	  	| Or'(lst) ->  (List.fold_left (fun (acc, expr) -> acc ^ ((genCode expr)^"\n cmp rax, SOB_FALSE\n jne Lexit\n")) "" lst) ^ "Lexit:"
-	    | If'(test,dit,dif) -> (genCode test) ^ "\n" ^
-	    					   "cmp rax, SOB_FALSE\n" ^
-	    					   "je Lelse\n" ^
-	    					   (genCode dit) ^ "\n" ^
-	    					   "jmp Lexit\n" ^
-	    					   "Lelse:\n" ^
-	    					   (genCode dif) ^ "\n" ^
-	    					   "Lexit:"
-	  	| BoxGet'(v) -> (genCode Var'(v)) ^ "\n" ^
+		| Seq'(lst) -> List.fold_left (fun (acc, expr) -> acc ^ (genCode expr) ^ "\n") ""  
+	 	| Or'(lst) ->  let exitLabel = (makeNumberedLabel "Lexit" !orCounter) in
+	  						(List.fold_left (fun (acc, expr) -> acc ^ ((genCode expr)^"\n cmp rax, SOB_FALSE\n jne " ^ exitLabel ^ "\n")) "" lst) ^ exitLabel ^ ":\n" ^ (incCounter orCounter)
+	    | If'(test,dit,dif) -> let exitLabel = (makeNumberedLabel "Lexit" !ifCounter) in
+	    					   let elseLabel = (makeNumberedLabel "Lelse" !ifCounter) in
+		    					   (genCode test) ^ "\n" ^
+		    					   "cmp rax, SOB_FALSE\n" ^
+		    					   "je " ^ elseLabel ^ "\n" ^
+		    					   (genCode dit) ^ "\n" ^
+		    					   "jmp " ^ exitLabel ^ "\n" ^
+		    					   elseLabel ^ ":\n" ^
+		    					   (genCode dif) ^ "\n" ^
+		    					   exitLabel ^ ":" ^ (incCounter ifCounter)
+		| BoxGet'(v) -> (genCode (Var'(v))) ^ "\n" ^
 	  						  "mov rax, qword [rax]"
 	    | BoxSet'(v, expr) -> (genCode expr) ^ "\n" ^
 	    							"push rax\n" ^
-	    							(genCode Var'(v)) ^ "\n" ^
+	    							(genCode (Var'(v))) ^ "\n" ^
 	    							"pop qword [rax]\n" ^
 	    							"mov rax, SOB_VOID"
-		| Applic'(proc,argList) -> applicCodeGen proc argsList
+		| Applic'(proc,argList) -> applicCodeGen proc argList
 	    | ApplicTP'(proc,params) -> 
 	    | LambdaSimple'(argNames,body) -> 
 	    | LambdaOpt'(args,option_arg,body) -> 
 	    | Def'(var,value) ->
 	    (*| Box'(variable) -> check this*) 
 	    and applicCodeGen proc argList =
+	    let notAClosureLabel = (makeNumberedLabel "NotAClosure" !applicCounter) in
+	    let finishedApplicLabel = (makeNumberedLabel "FinishedApplic" !applicCounter) in
 	    	(List.fold_right (fun (argExpr, acc) -> acc ^ ((genCode argExpr)^"\n push rax\n")) "" lst) ^ (*pushing the args last to first*)
 	    	"push " ^ (string_of_int (List.length argsList)) ^ "\n" ^ (*num of args*)
 	    	(genCode proc) ^ "\n" ^
 	    	"cmp rax, T_CLOSURE\n" ^
-	    	"jne NotAClosure\n" ^
-	    	"push [rax + TYPE_SIZE]\n" (*push env*)
-	    	"push qword [rbp + 8 * 1] ; old ret addr\n" (*: TODO: Check if we need this???*)
-	    	"call [rax + TYPE_SIZE + WORD_BYTES]\n" (*call proc-body*)
-	    	"jmp FinishedApplic\n"
-	    	"NotAClosure:\n"
-	    	(*TODO: what to do when proc isn't a closure??? - replace this line!*)
-	    	"FinishedApplic:\n"
+	    	"jne " ^ notAClosureLabel ^ "\n" ^
+	    	"push [rax + TYPE_SIZE]\n" ^ (*push env*)
+	    	"push qword [rbp + 8 * 1] ; old ret addr\n" ^(*: TODO: Check if we need this???*)
+	    	"call [rax + TYPE_SIZE + WORD_BYTES]\n" ^(*call proc-body*)
+	    	"jmp " ^ finishedApplicLabel ^ "\n" ^
+	    	notAClosureLabel ^ ":\n" ^
+	    	"\tmov rdi, .notACLosureError\n" ^
+	    	"\tcall print_string\n" ^
+	    	"\tmov rax, 1\n" ^
+	    	"\tsyscall\n" ^
+	    	finishedApplicLabel ^ ":\n" ^ (incCounter applicCounter)
 	in
 	genCode e;;
 
