@@ -205,7 +205,7 @@
     
 ; end macros that Shahar added from the practical session
 extern exit, printf, malloc
-global write_sob, write_sob_if_not_void
+global write_sob, write_sob_if_not_void, print_string
 
 	
 write_sob_undefined:
@@ -261,6 +261,7 @@ write_sob_char:
 	mov rbp, rsp
 
 	CHAR_VAL rsi, rsi
+	and rsi, 255 ;from facebook
 
 	cmp rsi, CHAR_NUL
 	je .Lnul
