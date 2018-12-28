@@ -18,8 +18,9 @@ let primitive_names_to_labels =
    "vector-length", "vector_length"; "vector-ref", "vector_ref"; "vector-set!", "vector_set";
    "make-vector", "make_vector"; "symbol->string", "symbol_to_string"; 
    "char->integer", "char_to_integer"; "integer->char", "integer_to_char"; "eq?", "is_eq";
-   "+", "bin_add"; "*", "bin_mul"; "-", "bin_sub"; "/", "bin_div"; "<", "bin_lt"; "=", "bin_equ"
-(* you can add yours here *)];;
+   "+", "bin_add"; "*", "bin_mul"; "-", "bin_sub"; "/", "bin_div"; "<", "bin_lt"; "=", "bin_equ";
+   "car", "car"; "cdr", "cdr"; "set-car!", "set_car"; "set-cdr!", "set_cdr"; "cons", "cons"
+(* todo: add apply implementation *)];;
 
 let make_prologue consts_tbl fvars_tbl =
   let get_const_address const = get_const_address const consts_tbl in
