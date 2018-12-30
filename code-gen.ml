@@ -28,7 +28,6 @@ end;;
 
 module Code_Gen : CODE_GEN = struct
 
-
 let removeDuplicates lst pred = 
 	let rec f origList reducedList = match origList with 
   		| [] -> reducedList
@@ -100,8 +99,6 @@ let make_fvars_tbl_helper fvarsList =
 		f fvarsList 0;;
 
 
-
-
 (*the folding function of expandCOnstList*)
 let rec expandConstant const accResult = match const with
 	| Sexpr(Symbol(str)) -> [Sexpr(String(str));const] @ accResult
@@ -159,10 +156,6 @@ let rec const_to_tuple const offset sexprs_offset =
  		| [] -> []
  		| (constant,offset) :: tail -> [(const_to_tuple constant offset consts_with_offsets)] @ (consts_to_tuple tail) in
  	consts_to_tuple consts_with_offsets;;
-
-
-
-
 
 
 (*---------print functions - only for tests - delete this----------*)
@@ -244,24 +237,17 @@ print_exprs = fun exprList ->
     | head :: [] -> (print_expr head) 
     | head :: tail -> (print_expr head) ^ "; " ^ (print_exprs tail)
 
-and
-
-print_exprs_as_list = fun exprList ->
+and print_exprs_as_list = fun exprList ->
   let exprsString = print_exprs exprList in
     "[ " ^ exprsString ^ " ]"
 
-and
-
-print_strings = fun stringList -> 
+and print_strings = fun stringList -> 
   match stringList with
     | [] -> ""
     | head :: [] -> head 
     | head :: tail -> head ^ "; " ^ (print_strings tail)
 
-and
-
-
-print_strings_as_list = fun stringList ->
+and print_strings_as_list = fun stringList ->
   let stringList = print_strings stringList in
     "[ " ^ stringList ^ " ]";;
 
@@ -270,69 +256,111 @@ let rec printThreesomesList lst =
     | [] -> ()
     | (name, (index, str))::cdr -> print_string (print_const name); print_string " , "; print_int index ; print_string (" "^str^" \n"); printThreesomesList cdr;;
 
-
 (*Mayers main functions*)
 let make_consts_tbl asts = populateConstList(expandConstList (make_consts_list asts));;
 
 let make_fvars_tbl asts = raise X_not_yet_implemented;;(*make_fvars_tbl_helper (make_fvars_list asts);;*)
 
+
 let generate consts fvars e = 
-	let rec genCode exp = match exp with
+let rec genCode exp deepCounter= match exp with
 		| Const'(c) -> "mov rax, " ^ get_const_address c consts (*todo: check this????*)
 	    | Var'(VarParam(_, minor)) -> "mov rax, qword [rbp + 8*(4 + " ^ (string_of_int minor) ^ ")]"
-	    | Set'(Var'(VarParam(_, minor)), exp) -> (genCode exp) ^ "\n" ^
+	    | Set'(Var'(VarParam(_, minor)), exp) -> (genCode exp deepCounter) ^ "\n" ^
 	    										  "mov qword [rbp + 8*(4 + " ^ (string_of_int minor) ^ ")], rax\n" ^
 	    										  "mov rax, SOB_VOID"
 	    | Var'(VarBound(_, major, minor)) -> "mov rax, qword[rpb + 8*2]\n" ^
 	    									 "mov rax, qword [rax + 8 * " ^ (string_of_int major) ^ "]\n" ^
 	    									 "mov rax, qword [rax + 8 * " ^ (string_of_int minor) ^ "]"
-		| Set'(Var'(VarBound(_, major, minor)), exp) -> (genCode exp) ^ "\n" ^
+		| Set'(Var'(VarBound(_, major, minor)), exp) -> (genCode exp deepCounter) ^ "\n" ^
 												  "mov rbx, qword[rpb + 8*2]\n" ^
 												  "mov rbx, qword [rbx + 8 * " ^ (string_of_int major) ^ "]\n" ^
 												  "mov qword [rbx + 8 * " ^ (string_of_int minor) ^ "], rax\n" ^
 	    										  "mov rax, SOB_VOID"
 	    | Var'(VarFree(x)) -> "mov rax, qword [" ^ (get_fvar_address x fvars) ^ "]" (*todo: check this????*)
-	    | Set'(Var'(VarFree(v)), exp) -> (genCode exp) ^ "\n" ^
+	    | Set'(Var'(VarFree(v)), exp) -> (genCode exp deepCounter) ^ "\n" ^
 	    							   "mov qword [" ^ (get_fvar_address v fvars) ^ "], rax\n" ^
 	    							   "mov rax, SOB_VOID"
-| Seq'(lst) -> List.fold_left (fun (acc, expr) -> acc ^ (genCode expr) ^ "\n") "" lst
-	  	| Or'(lst) ->  (List.fold_left (fun (acc, expr) -> acc ^ ((genCode expr)^"\n cmp rax, SOB_FALSE\n jne Lexit\n")) "" lst) ^ "Lexit:"
-	    | If'(test,dit,dif) -> (genCode test) ^ "\n" ^
+		| Seq'(lst) -> let f acc  expr =  (acc ^ (genCode expr deepCounter) ^ "\n") in List.fold_left  f "" lst
+	  	| Or'(lst) ->  let f acc expr = acc ^ (genCode expr deepCounter)^"\n cmp rax, SOB_FALSE\n jne Lexit\n" in (List.fold_left f "" lst) ^ "Lexit:"
+	    | If'(test,dit,dif) -> (genCode test deepCounter) ^ "\n" ^
 	    					   "cmp rax, SOB_FALSE\n" ^
 	    					   "je Lelse\n" ^
-	    					   (genCode dit) ^ "\n" ^
+	    					   (genCode dit deepCounter) ^ "\n" ^
 	    					   "jmp Lexit\n" ^
 	    					   "Lelse:\n" ^
-	    					   (genCode dif) ^ "\n" ^
+	    					   (genCode dif deepCounter) ^ "\n" ^
 	    					   "Lexit:"
-	  	| BoxGet'(v) -> (genCode Var'(v)) ^ "\n" ^
+		| BoxGet'(v) -> (genCode (Var' v) deepCounter) ^ "\n" ^
 	  						  "mov rax, qword [rax]"
-	    | BoxSet'(v, expr) -> (genCode expr) ^ "\n" ^
+	    | BoxSet'(v, expr) -> (genCode expr deepCounter) ^ "\n" ^
 	    							"push rax\n" ^
-	    							(genCode Var'(v)) ^ "\n" ^
+	    							(genCode (Var' v) deepCounter) ^ "\n" ^
 	    							"pop qword [rax]\n" ^
 	    							"mov rax, SOB_VOID"
-		| Applic'(proc,argList) -> applicCodeGen proc argsList
-	    | ApplicTP'(proc,params) -> 
-	    | LambdaSimple'(argNames,body) -> 
-	    | LambdaOpt'(args,option_arg,body) -> 
-	    | Def'(var,value) ->
+		| Applic'(proc,argList) -> applicCodeGen proc argList deepCounter
+	    | ApplicTP'(proc,params) -> raise X_not_yet_implemented
+	    | LambdaSimple'(argNames,body) -> lambdaCodeGen argNames body deepCounter
+	    | LambdaOpt'(args,option_arg,body) -> raise X_not_yet_implemented
+	    | Def'(var,value) -> raise X_not_yet_implemented 
 	    (*| Box'(variable) -> check this*) 
-	    and applicCodeGen proc argList =
-	    	(List.fold_right (fun (argExpr, acc) -> acc ^ ((genCode argExpr)^"\n push rax\n")) "" lst) ^ (*pushing the args last to first*)
-	    	"push " ^ (string_of_int (List.length argsList)) ^ "\n" ^ (*num of args*)
-	    	(genCode proc) ^ "\n" ^
+	    | _ -> raise X_not_yet_implemented
+	    
+	    and lambdaCodeGen args body envSize = 
+	    "MALLOC rax, "^ (string_of_int ((envSize+1)*8)) ^ "\n" ^
+	    "mov qword rbx, [rbp + 8 * 2]\n" ^ (*lexical env pointer *)
+	    (copyEnvLoop 0 1 envSize "") ^ "\n" ^ 
+	    "mov [extEnv], rax\n"  ^ (* save extEnv pointer *)
+	    "MALLOC rdx, [rbp + 8 * 3]\n" ^ (* number of params *)
+	    "mov [rax], rdx\n" ^
+	    (copyParams 0 (List.length args) "") ^ "\n" ^
+	    "MALLOC rax, 2*8\n" ^ (*malloc closure -- check this! maybe add tag?? *)
+	    "mov rdx, [extEnv]\n" ^(*check maube without [] *)
+	    "mov [rax], rdx\n" ^
+	    "mov rdx, Lcode\n"^ (*check this! *)
+	    "jmp Lcont\n" ^
+	    "Lcode:\n "^
+	    "push rbp\n" ^
+	    "mov rbp, rsp\n" ^
+	    (genCode body (envSize+1)) ^ "\n" ^
+	    "leave\n" ^
+	    "ret\n" ^ 
+	    "Lcont:\n"
+
+	    and copyParams i n str = 
+	    	if i<n then
+	    		(copyParams (i+1) n (str ^ 
+	    			"move rdx, [rax]\n" ^
+	    			"mov rbx, [rbp + 8*(4 + "^ (string_of_int (i*8)) ^ ")]\n"^ (*rbx = param(i) *)
+	    			"mov [rdx + " ^ (string_of_int (i*8)) ^ "], rbx\n" (*rdx = extEnv[0], rdx[i] = rbx *)
+	    		))
+	    	else str 
+	    
+	    and copyEnvLoop i j envSize str = 
+	    if i < envSize then 
+	    	(copyEnvLoop (i+1) (j+1) envSize (str ^
+	    	"mov qword rdx, [rbx + "^ (string_of_int (i*8)) ^ "]\n" ^ (*go to lexical env , tmp val is in rdx*)
+	    	"mov qword [rax + "^ (string_of_int (j*8)) ^"], rdx\n")) (*check if it is + or - *)
+	    else
+	    	str
+
+	    and applicCodeGen proc argList deepCounter=
+	    	let f argExpr  acc  = acc ^ ((genCode argExpr deepCounter)^"\n push rax\n") in
+	    	(List.fold_right f argList "") ^ (*pushing the args last to first*)
+	    	"push " ^ (string_of_int (List.length argList)) ^ "\n" ^ (*num of args*)
+	    	(genCode proc deepCounter) ^ "\n" ^
 	    	"cmp rax, T_CLOSURE\n" ^
 	    	"jne NotAClosure\n" ^
-	    	"push [rax + TYPE_SIZE]\n" (*push env*)
-	    	"push qword [rbp + 8 * 1] ; old ret addr\n" (*: TODO: Check if we need this???*)
-	    	"call [rax + TYPE_SIZE + WORD_BYTES]\n" (*call proc-body*)
-	    	"jmp FinishedApplic\n"
-	    	"NotAClosure:\n"
+	    	"push [rax + TYPE_SIZE]\n" ^(*push env*)
+	    	"push qword [rbp + 8 * 1] ; old ret addr\n" ^(*: TODO: Check if we need this???*)
+	    	"call [rax + TYPE_SIZE + WORD_BYTES]\n" ^ (*call proc-body*)
+	    	"jmp FinishedApplic\n" ^
+	    	"NotAClosure:\n" ^
 	    	(*TODO: what to do when proc isn't a closure??? - replace this line!*)
 	    	"FinishedApplic:\n"
 	in
-	genCode e;;
+	genCode e 0;;
+
 
 (*Tests*)
 (* - make_const_list test *)
@@ -370,6 +398,9 @@ printThreesomesList (populateConstList(expandConstList (make_consts_list  [Appli
  [
    Const'(Sexpr(Pair(Number(Int 1),Pair(Number(Int 2),Nil))));
    Var'(VarFree "list"); Const' (Sexpr (Symbol "ab"))])])));;
+*)
+print_string (generate [] [] (LambdaSimple' (["x"], Var' (VarParam ("x", 0)))));;
+(* LambdaSimple' ([], Const' (Sexpr (Number (Int (1)))))])])));;
 *)
 
 end;;
