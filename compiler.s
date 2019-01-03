@@ -34,7 +34,9 @@
 
 %define INT_VAL SKIP_TYPE_TAG
 
-%define CHAR_VAL SKIP_TYPE_TAG
+%macro CHAR_VAL 2
+	movzx %1, byte [%2+TYPE_SIZE]
+%endmacro
 
 %define FLOAT_VAL SKIP_TYPE_TAG
 
@@ -169,43 +171,10 @@
 %define MAKE_CLOSURE(r, env, body) \
         MAKE_TWO_WORDS r, T_CLOSURE, env, body
 
-; macros that Shahar added from the practical session
-%macro MAKE_LITERAL 2
-    db %1
-    %2
-%endmacro
-
-%define MAKE_LITERAL_INT(val) MAKE_LITERAL T_INTEGER, dq val
-%define MAKE_LITERAL_CHAR(val) MAKE_LITERAL T_CHAR, db val
-%define MAKE_NIL db T_NIL
-%define MAKE_VOID db T_VOID
-%define MAKE_BOOL(val) MAKE_LITERAL T_BOOL, db val
-
-%macro MAKE_LITERAL_STRING 1
-    db T_STRING
-    dq (%%end_str - %%str)
-%%str:
-    db %1
-%%end_str:
-%endmacro
-
-%define MAKE_LITERAL_CLOSURE(body) \
-    MAKE_WORDS_LIT T_CLOSURE, 0, body
-
-%macro MAKE_LITERAL_VECTOR 0-*
-    db T_VECTOR
-    dq %0
-%rep %0
-    dq %1
-%rotate 1
-%endrep
-%endmacro
-    
-; todo: ADD MAKE_LITERAL_SYMBOL & MAKE_UNDEF
-    
-; end macros that Shahar added from the practical session
+	
 extern exit, printf, malloc
-global write_sob, write_sob_if_not_void, print_string
+global write_sob, write_sob_if_not_void, print_string 
+
 
 	
 write_sob_undefined:
@@ -247,7 +216,11 @@ write_sob_float:
 	movq xmm0, rsi
 	mov rdi, .float_format_string
 	mov rax, 1
+
+	mov rsi, rsp
+	and rsp, -16
 	call printf
+	mov rsp, rsi
 
 	leave
 	ret
@@ -261,7 +234,7 @@ write_sob_char:
 	mov rbp, rsp
 
 	CHAR_VAL rsi, rsi
-	and rsi, 255 ;from facebook
+	 and rsi, 255 ;from facebook
 
 	cmp rsi, CHAR_NUL
 	je .Lnul
@@ -758,10 +731,3 @@ write_sob_if_not_void:
 section .data
 .newline:
 	db CHAR_NEWLINE, 0
-	
-section .text
-print_string:
-        push rax
-	mov rax, 0
-	call printf
-	pop rax
