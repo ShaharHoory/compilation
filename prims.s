@@ -893,4 +893,63 @@ bin_equ:
 
     leave
     ret
+    
+;our implementations: - TODO: implement apply
+car:
+    push rbp
+    mov rbp, rsp
 
+    mov rsi, PVAR(0)
+    mov rax, qword [rsi + TYPE_SIZE]
+
+    leave
+    ret
+    
+cdr:
+    push rbp
+    mov rbp, rsp
+
+    mov rsi, PVAR(0)
+    mov rax, qword [rsi + TYPE_SIZE + WORD_SIZE]
+
+    leave
+    ret
+    
+set_car:
+    push rbp
+    mov rbp, rsp
+
+    mov rsi, PVAR(0) 
+    CAR rsi, rsi
+    mov rdi, PVAR(1) ;new car
+
+    mov [rsi], rdi
+    mov rax, SOB_VOID_ADDRESS
+
+    leave
+    ret
+    
+set_cdr:
+    push rbp
+    mov rbp, rsp
+
+    mov rsi, PVAR(0) 
+    CDR rsi, rsi
+    mov rdi, PVAR(1) ;new cdr
+
+    mov [rsi], rdi
+    mov rax, SOB_VOID_ADDRESS
+
+    leave
+    ret
+    
+cons:
+    push rbp
+    mov rbp, rsp
+
+    mov rsi, PVAR(0) 
+    mov rdi, PVAR(1)
+    MAKE_PAIR rax, rsi, rdi ;todo: check if need to be [rsi], [rdi]
+    ;make_pair puts the result in rax
+    leave
+    ret

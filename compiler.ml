@@ -11,15 +11,16 @@ let string_to_asts s = List.map Semantics.run_semantics
                             (Reader.read_sexprs s));;
 
 let primitive_names_to_labels = 
-  ["boolean?", "is_boolean"; "float?", "is_float"; "integer?", "is_integer"; "pair?", "is_pair"; (*TODO: add mappings for our library functions implementations*)
+  ["boolean?", "is_boolean"; "float?", "is_float"; "integer?", "is_integer"; "pair?", "is_pair";
    "null?", "is_null"; "char?", "is_char"; "vector?", "is_vector"; "string?", "is_string";
    "procedure?", "is_procedure"; "symbol?", "is_symbol"; "string-length", "string_length";
    "string-ref", "string_ref"; "string-set!", "string_set"; "make-string", "make_string";
    "vector-length", "vector_length"; "vector-ref", "vector_ref"; "vector-set!", "vector_set";
    "make-vector", "make_vector"; "symbol->string", "symbol_to_string"; 
    "char->integer", "char_to_integer"; "integer->char", "integer_to_char"; "eq?", "is_eq";
-   "+", "bin_add"; "*", "bin_mul"; "-", "bin_sub"; "/", "bin_div"; "<", "bin_lt"; "=", "bin_equ"
-(* you can add yours here *)];;
+   "+", "bin_add"; "*", "bin_mul"; "-", "bin_sub"; "/", "bin_div"; "<", "bin_lt"; "=", "bin_equ";
+   "car", "car"; "cdr", "cdr"; "set-car!", "set_car"; "set-cdr!", "set_cdr"; "cons", "cons"
+(* todo: add apply implementation *)];;
 
 let make_prologue consts_tbl fvars_tbl =
   let get_const_address const = get_const_address const consts_tbl in
@@ -39,6 +40,8 @@ malloc_pointer:
     resq 1
 
 section .data
+.notACLosureError:
+	db \"Error: trying to apply not-a-closure\", 0
 const_tbl:
 " ^ (String.concat "\n" (List.map make_constant consts_tbl)) ^ "
 
