@@ -731,3 +731,10 @@ write_sob_if_not_void:
 section .data
 .newline:
 	db CHAR_NEWLINE, 0
+	
+section .text 
+print_string: 
+        push rax 
+  mov rax, 0 
+  call printf 
+  pop rax 
