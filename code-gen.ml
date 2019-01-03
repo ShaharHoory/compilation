@@ -1,5 +1,7 @@
 #use "semantic-analyser.ml";;
 
+exception X_for_testing;;
+
 (*functions for using also in compiler.ml *)
 let constant_eq s1 s2 = match s1, s2 with
 	| Sexpr(s1), Sexpr(s2) -> sexpr_eq s1 s2
@@ -312,7 +314,7 @@ let rec genCode exp deepCounter= match exp with
 	    							"pop qword [rax]\n" ^
 	    							"mov rax, SOB_VOID"
 		| Applic'(proc,argList) -> applicCodeGen proc argList deepCounter
-	    | ApplicTP'(proc,params) -> raise X_not_yet_implemented
+	    | ApplicTP'(proc,params) -> applicCodeGen proc params deepCounter (*raise X_not_yet_implemented*)
 	    | LambdaSimple'(argNames,body) -> lambdaCodeGen argNames body deepCounter
 	    | LambdaOpt'(args,option_arg,body) -> raise X_not_yet_implemented
 	    | Def'(var,value) -> raise X_not_yet_implemented 
