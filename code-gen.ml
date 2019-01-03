@@ -92,11 +92,18 @@ let make_fvars_list exprTag_lst =
 
 let undefined = "MAKE_UNDEF";;
 let runtimeFrameworkLabels = ["car";"cdr"; "map"];;
-let make_fvars_tbl_helper fvarsList = 
+(*let make_fvars_tbl_helper fvarsList = 
 	let rec f lst i = match lst with
 		| VarFree(head) :: tail -> if (List.mem head runtimeFrameworkLabels) then let pred x = (compare head x) ==0 in [(head,i,List.find pred runtimeFrameworkLabels)] @ (f tail (i+1)) else [(head, i, undefined)] @ (f tail (i+1))
 		| _ -> []  in
 		f fvarsList 0;;
+*)
+
+let make_fvars_tbl_helper fvarsList = 
+	let rec f lst i = match lst with
+		| VarFree(head) :: tail -> [(head,i)] @ (f tail (i+1))
+		| _ -> []  
+	in f fvarsList 0;;
 
 
 (*the folding function of expandCOnstList*)
@@ -259,7 +266,7 @@ let rec printThreesomesList lst =
 (*Mayers main functions*)
 let make_consts_tbl asts = populateConstList(expandConstList (make_consts_list asts));;
 
-let make_fvars_tbl asts = raise X_not_yet_implemented;;(*make_fvars_tbl_helper (make_fvars_list asts);;*)
+let make_fvars_tbl asts = make_fvars_tbl_helper (make_fvars_list asts);;
 
 let orCounter = ref 0;;
 let ifCounter = ref 0;;
