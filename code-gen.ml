@@ -264,6 +264,7 @@ let make_fvars_tbl asts = raise X_not_yet_implemented;;(*make_fvars_tbl_helper (
 let orCounter = ref 0;;
 let ifCounter = ref 0;;
 let applicCounter = ref 0;;
+let lambdaCounter = ref 0;;
 
 let incCounter counterRef = counterRef := !counterRef + 1 ; "";;
 
@@ -289,20 +290,21 @@ let rec genCode exp deepCounter= match exp with
 	    | Set'(Var'(VarFree(v)), exp) -> (genCode exp deepCounter) ^ "\n" ^
 	    							   "mov qword [" ^ (get_fvar_address v fvars) ^ "], rax\n" ^
 	    							   "mov rax, SOB_VOID"
-		| Seq'(lst) -> List.fold_left (fun (acc, expr) -> acc ^ (genCode expr) ^ "\n") ""  
+		| Seq'(lst) -> let f acc expr = (acc ^ (genCode expr deepCounter) ^ "\n") in (List.fold_left f ""  lst)
 	 	| Or'(lst) ->  let exitLabel = (makeNumberedLabel "Lexit" !orCounter) in
-	  						(List.fold_left (fun (acc, expr) -> acc ^ ((genCode expr)^"\n cmp rax, SOB_FALSE\n jne " ^ exitLabel ^ "\n")) "" lst) ^ exitLabel ^ ":\n" ^ (incCounter orCounter)
+	 					let f  acc expr = acc ^ ((genCode expr deepCounter)^"\n cmp rax, SOB_FALSE\n jne " ^ exitLabel ^ "\n") in
+	  						(List.fold_left f "" lst) ^ exitLabel ^ ":\n" ^ (incCounter orCounter)
 	    | If'(test,dit,dif) -> let exitLabel = (makeNumberedLabel "Lexit" !ifCounter) in
 	    					   let elseLabel = (makeNumberedLabel "Lelse" !ifCounter) in
-		    					   (genCode test) ^ "\n" ^
+		    					   (genCode test deepCounter) ^ "\n" ^
 		    					   "cmp rax, SOB_FALSE\n" ^
 		    					   "je " ^ elseLabel ^ "\n" ^
-		    					   (genCode dit) ^ "\n" ^
+		    					   (genCode dit deepCounter) ^ "\n" ^
 		    					   "jmp " ^ exitLabel ^ "\n" ^
 		    					   elseLabel ^ ":\n" ^
-		    					   (genCode dif) ^ "\n" ^
+		    					   (genCode dif deepCounter) ^ "\n" ^
 		    					   exitLabel ^ ":" ^ (incCounter ifCounter)
-		| BoxGet'(v) -> (genCode (Var'(v))) ^ "\n" ^
+		| BoxGet'(v) -> (genCode (Var'(v)) deepCounter) ^ "\n" ^
 	  						  "mov rax, qword [rax]"
 	    | BoxSet'(v, expr) -> (genCode expr deepCounter) ^ "\n" ^
 	    							"push rax\n" ^
@@ -314,16 +316,14 @@ let rec genCode exp deepCounter= match exp with
 	    | LambdaSimple'(argNames,body) -> lambdaCodeGen argNames body deepCounter
 	    | LambdaOpt'(args,option_arg,body) -> raise X_not_yet_implemented
 	    | Def'(var,value) -> raise X_not_yet_implemented 
-	    (*| Box'(variable) -> check this*) 
-	    and applicCodeGen proc argList =
-	    let notAClosureLabel = (makeNumberedLabel "NotAClosure" !applicCounter) in
-	    let finishedApplicLabel = (makeNumberedLabel "FinishedApplic" !applicCounter) in
-	    	(List.fold_right (fun (argExpr, acc) -> acc ^ ((genCode argExpr)^"\n push rax\n")) "" lst) ^ (*pushing the args last to first*)
-	    	"push " ^ (string_of_int (List.length argsList)) ^ "\n" ^ (*num of args*)
-	    	(genCode proc) ^ "\n" ^
 	    | _ -> raise X_not_yet_implemented
+
+	    (*| Box'(variable) -> check this*) 
 	    
-	    and lambdaCodeGen args body envSize = 
+
+	    and lambdaCodeGen args body envSize =
+	    let lcodeLabel = (makeNumberedLabel "Lcode" !lambdaCounter) in
+	    let lcontLabel = (makeNumberedLabel "Lcont" !lambdaCounter) in 
 	    "MALLOC rax, "^ (string_of_int ((envSize+1)*8)) ^ "\n" ^
 	    "mov qword rbx, [rbp + 8 * 2]\n" ^ (*lexical env pointer *)
 	    (copyEnvLoop 0 1 envSize "") ^ "\n" ^ 
@@ -334,15 +334,15 @@ let rec genCode exp deepCounter= match exp with
 	    "MALLOC rax, 2*8\n" ^ (*malloc closure -- check this! maybe add tag?? *)
 	    "mov rdx, [extEnv]\n" ^(*check maube without [] *)
 	    "mov [rax], rdx\n" ^
-	    "mov rdx, Lcode\n"^ (*check this! *)
-	    "jmp Lcont\n" ^
-	    "Lcode:\n "^
+	    "mov rdx," ^ lcodeLabel ^ "\n"^ (*check this! *)
+	    "jmp " ^ lcontLabel ^ "\n" ^
+	    lcodeLabel ^ ":\n "^
 	    "push rbp\n" ^
 	    "mov rbp, rsp\n" ^
 	    (genCode body (envSize+1)) ^ "\n" ^
 	    "leave\n" ^
 	    "ret\n" ^ 
-	    "Lcont:\n"
+	    lcontLabel ^ ":\n " ^ (incCounter lambdaCounter)
 
 	    and copyParams i n str = 
 	    	if i<n then
@@ -361,8 +361,11 @@ let rec genCode exp deepCounter= match exp with
 	    else
 	    	str
 
+
 	    and applicCodeGen proc argList deepCounter=
-	    	let f argExpr  acc  = acc ^ ((genCode argExpr deepCounter)^"\n push rax\n") in
+	    let notAClosureLabel = (makeNumberedLabel "NotAClosure" !applicCounter) in
+	    let finishedApplicLabel = (makeNumberedLabel "FinishedApplic" !applicCounter) in
+	    let f argExpr acc = acc ^ ((genCode argExpr deepCounter)^"\n push rax\n") in 
 	    	(List.fold_right f argList "") ^ (*pushing the args last to first*)
 	    	"push " ^ (string_of_int (List.length argList)) ^ "\n" ^ (*num of args*)
 	    	(genCode proc deepCounter) ^ "\n" ^
@@ -378,8 +381,9 @@ let rec genCode exp deepCounter= match exp with
 	    	"\tmov rax, 1\n" ^
 	    	"\tsyscall\n" ^
 	    	finishedApplicLabel ^ ":\n" ^ (incCounter applicCounter)
-	in
-	genCode e 0;;
+	   in genCode e 0;;
+	    	
+
 
 
 (*Tests*)
