@@ -23,8 +23,8 @@ let primitive_names_to_labels =
 (* todo: add apply implementation *)];;
 
 let make_prologue consts_tbl fvars_tbl =
-  let get_const_address const = get_const_address const consts_tbl in
-  let get_fvar_address constString = get_fvar_address constString fvars_tbl in
+  let get_const_address const = const_address const consts_tbl in
+  let get_fvar_address constString = fvar_address constString fvars_tbl in
   let make_primitive_closure (prim, label) =
 "    MAKE_CLOSURE(rax, SOB_NIL_ADDRESS, " ^ label  ^ ")
     mov [" ^ (get_fvar_address prim)  ^ "], rax" in

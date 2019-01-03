@@ -12,12 +12,12 @@ let varFree_eq v1 v2 = match v1,v2 with
 	| VarFree(s1), VarFree(s2) -> if (compare s1 s2 ==0 ) then true else false
 	| _ -> false;;
 
-let get_const_address const consts_tbl = 
+let const_address const consts_tbl = 
 	let filtered = List.filter (fun ((c, (addr, representation))) -> constant_eq const c) consts_tbl in   (*filtered =  [(a, (b, c))] *)
         let (a, (addr, b)) = List.hd filtered in
            string_of_int addr;;
 
-let get_fvar_address constString fvars_tbl = 
+let fvar_address constString fvars_tbl = 
 	let filtered = List.filter (fun ((varName, addr)) -> String.equal constString varName) fvars_tbl in   (*filtered =  [(a, b))] *)
         let (a, addr) = List.hd filtered in
             string_of_int addr;;
@@ -282,7 +282,7 @@ let makeNumberedLabel label num =
 
 let generate consts fvars e = 
 let rec genCode exp deepCounter= match exp with
-		| Const'(c) -> "mov rax, " ^ get_const_address c consts (*todo: check this????*)
+		| Const'(c) -> "mov rax, " ^ const_address c consts (*todo: check this????*)
 	    | Var'(VarParam(_, minor)) -> "mov rax, qword [rbp + 8*(4 + " ^ (string_of_int minor) ^ ")]"
 	    | Set'(Var'(VarParam(_, minor)), exp) -> (genCode exp deepCounter) ^ "\n" ^
 	    										  "mov qword [rbp + 8*(4 + " ^ (string_of_int minor) ^ ")], rax\n" ^
@@ -295,9 +295,9 @@ let rec genCode exp deepCounter= match exp with
 												  "mov rbx, qword [rbx + 8 * " ^ (string_of_int major) ^ "]\n" ^
 												  "mov qword [rbx + 8 * " ^ (string_of_int minor) ^ "], rax\n" ^
 	    										  "mov rax, SOB_VOID"
-	    | Var'(VarFree(x)) -> "mov rax, qword [" ^ (get_fvar_address x fvars) ^ "]" (*todo: check this????*)
+	    | Var'(VarFree(x)) -> "mov rax, qword [" ^ (fvar_address x fvars) ^ "]" (*todo: check this????*)
 	    | Set'(Var'(VarFree(v)), exp) -> (genCode exp deepCounter) ^ "\n" ^
-	    							   "mov qword [" ^ (get_fvar_address v fvars) ^ "], rax\n" ^
+	    							   "mov qword [" ^ (fvar_address v fvars) ^ "], rax\n" ^
 	    							   "mov rax, SOB_VOID"
 		| Seq'(lst) -> let f acc expr = (acc ^ (genCode expr deepCounter) ^ "\n") in (List.fold_left f ""  lst)
 	 	| Or'(lst) ->  let exitLabel = (makeNumberedLabel "Lexit" !orCounter) in
