@@ -57,6 +57,8 @@ fvar_tbl:
 global main
 section .text
 main:
+  push rbp
+  mov rbp, rsp
     ;; set up the heap
     mov rdi, GB(4)
     call malloc
@@ -72,9 +74,8 @@ main:
     push qword T_UNDEFINED
     push rsp
 
-    call code_fragment
-    add rsp, 4*8
-    ret
+    jmp code_fragment
+    
 
 code_fragment:
     ;; Set up the primitive stdlib fvars:
@@ -83,7 +84,9 @@ code_fragment:
     ;; This is where we emulate the missing (define ...) expressions
     ;; for all the primitive procedures.
 " ^ (String.concat "\n" (List.map make_primitive_closure primitive_names_to_labels)) ^ "
- 
+ add rsp, 4*8
+ pop rbp
+    ret
 ";;
 
 let epilogue = raise X_not_yet_implemented;;
