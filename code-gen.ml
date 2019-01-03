@@ -89,7 +89,17 @@ let make_fvars_list exprTag_lst =
 				| ApplicTP'(proc, argsList) ->  accList @ (List.flatten (List.map findFreeVarsInExpr' ([proc] @ argsList))) in
 	buildFreeVarList [] in
   let freeVarsList = List.flatten (List.map findFreeVarsInExpr' exprTag_lst) in
-  let withInitialfreeVars= [VarFree("car"); VarFree("cdr"); VarFree("map")] @ freeVarsList in
+
+
+  let withInitialfreeVars= [VarFree("boolean?"); VarFree("float?"); VarFree("integer?"); VarFree("pair?");
+   VarFree("null?"); VarFree("char?"); VarFree("vector?"); VarFree("string?");
+   VarFree("procedure?"); VarFree("symbol?"); VarFree("string-length");
+   VarFree("string-ref"); VarFree("string-set!"); VarFree("make-string");
+   VarFree("vector-length"); VarFree("vector-ref"); VarFree("vector-set!");
+   VarFree("make-vector"); VarFree("symbol->string"); 
+   VarFree("char->integer"); VarFree("integer->char"); VarFree("eq?");
+   VarFree("+"); VarFree("*"); VarFree("-"); VarFree("/"); VarFree("<"); VarFree("=");
+   VarFree("car"); VarFree("cdr"); VarFree("set-car!"); VarFree("set-cdr!"); VarFree("cons")] @ freeVarsList in
 	removeDuplicatesVarFreeList withInitialfreeVars;;
 
 let undefined = "MAKE_UNDEF";;
@@ -432,7 +442,7 @@ printThreesomesList (populateConstList(expandConstList (make_consts_list  [Appli
    Const'(Sexpr(Pair(Number(Int 1),Pair(Number(Int 2),Nil))));
    Var'(VarFree "list"); Const' (Sexpr (Symbol "ab"))])])));;
 *)
-print_string (generate [] [] (LambdaSimple' (["x"], Var' (VarParam ("x", 0)))));;
+
 (* LambdaSimple' ([], Const' (Sexpr (Number (Int (1)))))])])));;
 *)
 

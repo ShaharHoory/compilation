@@ -404,6 +404,7 @@ let run_semantics expr =
     (annotate_tail_calls
        (annotate_lexical_addresses expr));;
 
-
+List.map run_semantics (Tag_Parser.tag_parse_expressions
+                            (Reader.read_sexprs "1"));;
 
 end;; (* struct Semantics *)
