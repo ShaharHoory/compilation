@@ -1,16 +1,15 @@
-
 (define append
-    (let ((null? null?) (car car) (cdr cdr) (cons cons))
-      (lambda args
-        ((letrec ((f (lambda (ls args)
-                       (if (null? args)
-                           ls
-                           ((letrec ((g (lambda (ls)
-                                          (if (null? ls)
-                                              (f (car args) (cdr args))
-                                              (cons (car ls) (g (cdr ls)))))))
-                              g) ls)))))
-           f) '() args))))
+  (let ((null? null?) (car car) (cdr cdr) (cons cons))
+    (lambda args
+      ((letrec ((f (lambda (ls args)
+                     (if (null? args)
+                         ls
+                         ((letrec ((g (lambda (ls)
+                                        (if (null? ls)
+                                            (f (car args) (cdr args))
+                                            (cons (car ls) (g (cdr ls)))))))
+                            g) ls)))))
+         f) '() args))))
 
 (define zero? 
   (let ((= =))
@@ -34,16 +33,16 @@
 	(loop x 0)))))
 
 (define make-string
-  (let ((null? null?)(car car)(= =)(length length))
+  (let ((null? null?)(make-string make-string)(car car)(= =)(length length))
     (lambda (x . y)
       (cond ((null? y) (make-string x #\nul))
 	    ((= 1 (length y)) (make-string x (car y)))
 	    (else "this should be an error, but you don't support exceptions")))))
 
 (define make-vector
-  (let ((length length) (car car)(null? null?))
+  (let ((length length)(make-vector make-vector)(car car)(null? null?))
     (lambda (x . y)
-      (cond ((null? y) (make-vector x #\nul))
+      (cond ((null? y) (make-vector x 0))
 	    ((= 1 (length y)) (make-vector x (car y)))
 	    (else "this should be an error, but you don't support exceptions")))))
 
