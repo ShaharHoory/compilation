@@ -155,7 +155,7 @@ let rec sexpr_to_tuple sexpr offset sexprs_offset=
 	let toTuple str = (Sexpr(sexpr),(offset, str)) in match sexpr with 
 	| Nil -> toTuple "MAKE_NIL"
 	| Char(c) -> toTuple ("MAKE_LITERAL_CHAR(\'"^(Char.escaped c)^"\')")
-	| Bool(b) -> if b then toTuple "MAKE_BOOL(1)" else toTuple "MAKE_BOOL(0)"
+	| Bool(b) -> if b then toTuple "MAKE_LITERAL T_BOOL, db 1" (*"MAKE_BOOL(1)"*) else toTuple "MAKE_LITERAL T_BOOL, db 0"
 	| Number(Int(a)) -> toTuple ("MAKE_LITERAL_INT("^(string_of_int a)^")")
 	| Number(Float(a)) -> toTuple ("MAKE_LITERAL_FLOAT("^(string_of_float a)^")") (*TODO:: check this!! *)
 	| String(str) -> toTuple ("MAKE_LITERAL_STRING(\""^str^"\")")
@@ -292,7 +292,7 @@ let makeNumberedLabel label num =
 
 let generate consts fvars e = 
 let rec genCode exp deepCounter= match exp with
-		| Const'(c) -> "mov rax, " ^ const_address c consts (*todo: check this????*)
+		| Const'(c) -> "mov rax, " ^ const_address c consts(*todo: check this????*)
 	    | Var'(VarParam(_, minor)) -> "mov rax, qword [rbp + 8*(4 + " ^ (string_of_int minor) ^ ")]"
 	    | Set'(Var'(VarParam(_, minor)), exp) -> (genCode exp deepCounter) ^ "\n" ^
 	    										  "mov qword [rbp + 8*(4 + " ^ (string_of_int minor) ^ ")], rax\n" ^

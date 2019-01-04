@@ -40,6 +40,82 @@ malloc_pointer:
     resq 1
 
 section .data
+
+;;macros we added:
+%define WORD_BYTES 8
+
+
+
+%macro MAKE_LITERAL 2
+db %1
+%2
+%endmacro
+
+%define MAKE_LITERAL_INT (val) MAKE_LITERAL T_INTEGER, dq val
+%define MAKE_LITERAL_CHAR (val) MAKE_LITERAL T_CHAR, db val
+%define MAKE_NIL db T_NIL
+%define MAKE_VOID db T_VOID
+%define MAKE_BOOL (val) MAKE_LITERAL T_BOOL, db val
+
+
+
+
+%define MAKE_INT(r,val) MAKE_LONG_VALUE r, val, T_INTEGER
+%define MAKE_FLOAT(r,val) MAKE_LONG_VALUE r, val, T_FLOAT
+%define MAKE_CHAR(r,val) MAKE_CHAR_VALUE r, val
+
+
+
+%macro MAKE_LITERAL_STRING 1
+db file_to_string
+dq (%%end_str - %%str)
+%%str:
+db %1
+%%end_str:
+%endmacro
+
+
+%define TYPE(r) byte [r]
+%define DATA(r) [r+TYPE_SIZE]
+
+%define INT_DATA(r) qword DATA(r)
+%define FLOAT_DATA(r) qword DATA(r)
+%define CHAR_DATA(r) byte DATA(r)
+%define BOOL_DATA(r) byte DATA(r)
+
+%define STR_LEN(r) qword DATA(r)
+%define STR_DATA_PTR(r) r + WORD_BYTES+ TYPE_SIZE
+%define STRING_REF(r,i) byte [r+WORD_BYTES+ TYPE_SIZE + i]
+
+
+
+%define MAKE_PAIR(r,car,cdr) MAKE_TWO_WORDS r, T_PAIR, car, cdr
+%define MAKE_LITERAL_PAIR(car,cdr) MAKE_WORDS_LIT T_PAIR, car, cdr
+%define MAKE_CLOSURE(r,env,body) MAKE_TWO_WORDS r, T_CLOSURE,  env, body
+%define MAKE_LITERAL_CLOSURE(body) MAKE_WORDS_LIT T_CLOSURE,0,body
+
+
+%macro MAKE_LITERAL_VECTOR 0-*
+db T_VECTOR
+dq %0
+%rep %0
+dq %1
+%rotate 1
+%endrep
+%endmacro
+
+%define LOWER_DATA(sob) qword [sob+ TYPE_SIZE]
+%define UPPER_DATA(sob) qword [sob+WORD_BYTES +TYPE_SIZE]
+%define CAR LOWER_DATA
+%define CDR UPPER_DATA
+%define ENV LOWER_DATA
+%define BODY UPPER_DATA
+%define VECTOR_LEN LOWER_DATA
+%define VECTOR_REF(r,i) qword [r+TYPE_SIZE+WORD_BYTES+i*WORD_BYTES]
+
+;;end self written macros!!!
+
+
 .notACLosureError:
 	db \"Error: trying to apply not-a-closure\", 0
 const_tbl:
@@ -51,6 +127,8 @@ const_tbl:
 %define SOB_NIL_ADDRESS " ^ get_const_address (Sexpr Nil) ^ "
 %define SOB_FALSE_ADDRESS " ^ get_const_address (Sexpr (Bool true)) ^ "
 %define SOB_TRUE_ADDRESS " ^ get_const_address (Sexpr (Bool false)) ^ "
+
+
 
 fvar_tbl:
 " ^ (String.concat "\n" (List.map (fun _ -> "dq T_UNDEFINED") fvars_tbl)) ^ "
@@ -111,43 +189,43 @@ cdr:
     ret
     
 set_car:
-    push rbp
-    mov rbp, rsp
+ ;   push rbp
+ ;   mov rbp, rsp
 
-    mov rsi, PVAR(0) 
-    CAR rsi, rsi
-    mov rdi, PVAR(1) ;new car
+    ;mov rsi, PVAR(0) 
+    ;CAR rsi, rsi
+    ;mov rdi, PVAR(1) ;new car
 
-    mov [rsi], rdi
-    mov rax, SOB_VOID_ADDRESS
+    ;mov [rsi], rdi
+    ;mov rax, SOB_VOID_ADDRESS
 
-    leave
-    ret
+    ;leave
+    ;ret
     
 set_cdr:
-    push rbp
-    mov rbp, rsp
+    ;push rbp
+    ;mov rbp, rsp
 
-    mov rsi, PVAR(0) 
-    CDR rsi, rsi
-    mov rdi, PVAR(1) ;new cdr
+    ;mov rsi, PVAR(0) 
+    ;CDR rsi, rsi
+    ;mov rdi, PVAR(1) ;new cdr
 
-    mov [rsi], rdi
-    mov rax, SOB_VOID_ADDRESS
+    ;mov [rsi], rdi
+    ;mov rax, SOB_VOID_ADDRESS
 
-    leave
-    ret
+    ;leave
+    ;ret
     
 cons:
-    push rbp
-    mov rbp, rsp
+    ;push rbp
+    ;mov rbp, rsp
 
-    mov rsi, PVAR(0) 
-    mov rdi, PVAR(1)
-    MAKE_PAIR rax, rsi, rdi ;todo: check if need to be [rsi], [rdi]
-    ;make_pair puts the result in rax
-    leave
-    ret";;
+    ;mov rsi, PVAR(0) 
+    ;mov rdi, PVAR(1)
+    ;MAKE_PAIR rax, rsi, rdi ;todo: check if need to be [rsi], [rdi]
+    ;;make_pair puts the result in rax
+    ;leave
+    ;ret";;
 
 exception X_missing_input_file;;
 
@@ -163,7 +241,7 @@ try
                            (fun ast -> (generate ast) ^ "\n    call write_sob_if_not_void")
                            asts) in
   let provided_primitives = file_to_string "prims.s" in
-                   
+                  
   print_string ((make_prologue consts_tbl fvars_tbl)  ^
                   code_fragment ^
                     provided_primitives ^ "\n" ^ epilogue)
